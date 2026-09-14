@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/keel-hq/keel/approvals"
+	"github.com/keel-hq/keel/bot"
 	"github.com/keel-hq/keel/types"
 	"github.com/slack-go/slack"
 
@@ -53,11 +54,12 @@ func (b *Bot) NotifyRolloutFailure(approval *types.Approval) error {
 	return err
 }
 
-// createRolloutFailureMessage - the thread reply about a failed rollout: the approvers and what failed
+// createRolloutFailureMessage - the thread reply about a failed rollout: the approvers, what failed, and a roll
+// back button
 func createRolloutFailureMessage(req *types.Approval) (slack.Blocks, string) {
 	_, name := approvalWorkload(req)
 
-	text := rolloutStatus(req, name)
+	text := rolloutStatus(req, name, false)
 	if voters := req.GetVoters(); len(voters) > 0 {
 		text = formatVoters(voters) + " " + text
 	}
@@ -65,16 +67,97 @@ func createRolloutFailureMessage(req *types.Approval) (slack.Blocks, string) {
 	blocks := []slack.Block{
 		slack.NewSectionBlock(slack.NewTextBlockObject("mrkdwn", text, false, false), nil, nil),
 	}
+	if req.RollbackError() == nil {
+		blocks = append(blocks, createRollbackButton(req, name))
+	}
 
 	return slack.Blocks{BlockSet: blocks}, "Rollout of " + name + " failed"
 }
 
-// rolloutStatus - the line about the rollout of an approved update, empty when nothing rolls out:
+// rolloutBlocks - the blocks about the rollout of an approved update: its progress or outcome and a roll back
+// button once it is live or failed, or the rollback and its own rollout once rolled back. Nil when nothing rolled
+// out.
+func rolloutBlocks(req *types.Approval, group string) []slack.Block {
+	if req.RolledBackBy != "" {
+		blocks := []slack.Block{
+			compactContext(fmt.Sprintf(":rewind: Rolled back to %s by %s · database changes are not rolled back",
+				escapeMrkdwn(previousReference(req)),
+				formatVoters([]string{req.RolledBackBy}),
+			)),
+		}
+		if status := rolloutStatus(req, group, false); status != "" {
+			blocks = append(blocks, compactContext(status))
+		}
+		return blocks
+	}
+
+	status := rolloutStatus(req, group, true)
+	if status == "" {
+		return nil
+	}
+
+	blocks := []slack.Block{compactContext(status)}
+	if req.RollbackFailure != "" {
+		blocks = append(blocks, compactContext(":warning: Roll back failed: "+escapeMrkdwn(req.RollbackFailure)))
+	}
+	if state := req.RolloutState(); (state == types.RolloutStateLive || state == types.RolloutStateFailed) && req.RollbackError() == nil {
+		blocks = append(blocks, createRollbackButton(req, group))
+	}
+	return blocks
+}
+
+// createRollbackButton - the roll back button of an approval, confirming what it sets back and that database
+// changes are not rolled back
+func createRollbackButton(req *types.Approval, group string) *slack.ActionBlock {
+	var names []string
+	for _, target := range req.Rollout {
+		names = append(names, shortMemberName(target.Name, group))
+	}
+
+	confirm := slack.NewConfirmationBlockObject(
+		slack.NewTextBlockObject("plain_text", "Roll back?", false, false),
+		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("Sets %s back to %s. Database changes are not rolled back.",
+			escapeMrkdwn(strings.Join(names, ", ")),
+			escapeMrkdwn(previousReference(req)),
+		), false, false),
+		slack.NewTextBlockObject("plain_text", "Roll back", false, false),
+		slack.NewTextBlockObject("plain_text", "Cancel", false, false),
+	)
+
+	button := slack.NewButtonBlockElement(
+		bot.RollbackResponseKeyword,
+		req.ID,
+		slack.NewTextBlockObject("plain_text", "Roll back", true, false),
+	)
+	button.Style = slack.StyleDanger
+	button.Confirm = confirm
+
+	return slack.NewActionBlock("", button)
+}
+
+// previousReference - what a rollback sets the resources back to: the revision of the image that ran before when
+// it is known, otherwise its digest
+func previousReference(req *types.Approval) string {
+	if req.CurrentRevision != "" {
+		return shortRevision(req.CurrentRevision)
+	}
+	for _, target := range req.Rollout {
+		for _, container := range target.Containers {
+			if container.PreviousDigest != "" {
+				return types.ShortDigest(container.PreviousDigest)
+			}
+		}
+	}
+	return "the previous image"
+}
+
+// rolloutStatus - the line about the rollout of an approved update or of its rollback, empty when nothing rolls
+// out. The approvers are named on the live line when approvers is set:
 //
 //	:hourglass_flowing_sand: Rolling out · api 2/2 · portal 1/2
 //	:white_check_mark: Live on api, portal in 41s · approved by <@U01ABCDEF>
 //	:x: portal not ready after 10m · ImagePullBackOff
-func rolloutStatus(req *types.Approval, group string) string {
+func rolloutStatus(req *types.Approval, group string, approvers bool) string {
 	switch req.RolloutState() {
 	case types.RolloutStateRolling:
 		parts := []string{":hourglass_flowing_sand: Rolling out"}
@@ -94,7 +177,7 @@ func rolloutStatus(req *types.Approval, group string) string {
 			}
 		}
 		status := ":white_check_mark: Live on " + escapeMrkdwn(strings.Join(names, ", ")) + " in " + formatDuration(req.RolloutDuration())
-		if voters := req.GetVoters(); len(voters) > 0 {
+		if voters := req.GetVoters(); approvers && len(voters) > 0 {
 			status += " · approved by " + formatVoters(voters)
 		}
 		return status

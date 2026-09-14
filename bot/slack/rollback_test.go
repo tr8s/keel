@@ -1,0 +1,123 @@
+package slack
+
+import (
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/keel-hq/keel/bot"
+	"github.com/keel-hq/keel/types"
+)
+
+// deployedGroupApproval - the trackeid group approval with the rollouts of both members, which can be rolled back
+func deployedGroupApproval(apiState, portalState types.RolloutState) *types.Approval {
+	started := time.Now().Add(-time.Hour)
+	target := func(state types.RolloutState, name string) types.RolloutTarget {
+		t := types.RolloutTarget{
+			State:      state,
+			Ready:      2,
+			Desired:    2,
+			StartedAt:  started,
+			FinishedAt: started.Add(41 * time.Second),
+			Containers: []types.RolloutContainer{{Name: "app", Image: "registry.example.com/tr8s/" + name + ":main", PreviousDigest: "sha256:96df4af0000000000000000000000000000000000000000000000000000000", NewDigest: "sha256:e3a91130000000000000000000000000000000000000000000000000000000"}},
+		}
+		if state == types.RolloutStateFailed {
+			t.Ready, t.Reason, t.FinishedAt = 1, "ImagePullBackOff", started.Add(10*time.Minute)
+		}
+		if state == types.RolloutStateRolling {
+			t.Ready, t.FinishedAt = 1, time.Time{}
+		}
+		return t
+	}
+	req := approvedGroupApproval(target(apiState, "trackeid-api"), target(portalState, "trackeid-portal"))
+	req.ID = "0b5e4a2c-approval"
+	return req
+}
+
+func TestCompactRollback(t *testing.T) {
+	rollbackButton := `"action_id":"` + bot.RollbackResponseKeyword + `"`
+
+	tests := []struct {
+		name     string
+		approval func() *types.Approval
+		contains []string
+		excludes []string
+	}{
+		{
+			name:     "live offers a roll back",
+			approval: func() *types.Approval { return deployedGroupApproval(types.RolloutStateLive, types.RolloutStateLive) },
+			contains: []string{
+				":white_check_mark: Live on api, portal in 41s · approved by <@U01ABCDEF>",
+				rollbackButton,
+				`"value":"0b5e4a2c-approval"`,
+				"Sets api, portal back to 5f55a51. Database changes are not rolled back.",
+			},
+		},
+		{
+			name:     "failed offers a roll back",
+			approval: func() *types.Approval { return deployedGroupApproval(types.RolloutStateLive, types.RolloutStateFailed) },
+			contains: []string{":x: portal not ready after 10m · ImagePullBackOff", rollbackButton},
+		},
+		{
+			name: "rolled back",
+			approval: func() *types.Approval {
+				req := deployedGroupApproval(types.RolloutStateRolling, types.RolloutStateLive)
+				now := time.Now()
+				req.RolledBackBy, req.RolledBackAt = "U02ROLLBACK", &now
+				return req
+			},
+			contains: []string{
+				":rewind: Rolled back to 5f55a51 by <@U02ROLLBACK> · database changes are not rolled back",
+				":hourglass_flowing_sand: Rolling out · api 1/2 · portal 2/2",
+			},
+			excludes: []string{rollbackButton, "approved by"},
+		},
+		{
+			name: "refused rollback",
+			approval: func() *types.Approval {
+				req := deployedGroupApproval(types.RolloutStateLive, types.RolloutStateLive)
+				req.RollbackFailure = "trackeid-api was updated again since"
+				return req
+			},
+			contains: []string{":warning: Roll back failed: trackeid-api was updated again since"},
+			excludes: []string{rollbackButton},
+		},
+		{
+			name: "no roll back without the previous images",
+			approval: func() *types.Approval {
+				req := deployedGroupApproval(types.RolloutStateLive, types.RolloutStateLive)
+				req.Rollout[1].Containers[0].PreviousDigest = ""
+				return req
+			},
+			contains: []string{":white_check_mark: Live on api, portal"},
+			excludes: []string{rollbackButton},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			blocks, _ := createCompactBlockMessage(tt.approval())
+			rendered := renderBlocks(t, blocks)
+			for _, expected := range tt.contains {
+				if !strings.Contains(rendered, expected) {
+					t.Errorf("expected %q in: %s", expected, rendered)
+				}
+			}
+			for _, unexpected := range tt.excludes {
+				if strings.Contains(rendered, unexpected) {
+					t.Errorf("did not expect %q in: %s", unexpected, rendered)
+				}
+			}
+		})
+	}
+}
+
+func TestRolloutFailureMessageOffersRollback(t *testing.T) {
+	blocks, _ := createRolloutFailureMessage(deployedGroupApproval(types.RolloutStateLive, types.RolloutStateFailed))
+	rendered := renderBlocks(t, blocks)
+	for _, expected := range []string{"<@U01ABCDEF> :x: portal not ready after 10m · ImagePullBackOff", `"action_id":"` + bot.RollbackResponseKeyword + `"`} {
+		if !strings.Contains(rendered, expected) {
+			t.Errorf("expected %q in: %s", expected, rendered)
+		}
+	}
+}

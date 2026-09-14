@@ -14,6 +14,8 @@ const (
 	AuditActionApprovalRejected = "rejected"
 	AuditActionApprovalExpired  = "expired"
 	AuditActionApprovalArchived = "archived"
+	// the approved updates were rolled back
+	AuditActionApprovalRolledBack = "rolled back"
 
 	// audit specific resource kinds (others are set by
 	// providers, ie: deployment, daemonset, helm chart)

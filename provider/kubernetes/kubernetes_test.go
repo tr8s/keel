@@ -55,6 +55,8 @@ type fakeImplementer struct {
 
 	// stores value of an updated deployment
 	updated *k8s.GenericResource
+	// stores every updated resource, in order
+	updates []*k8s.GenericResource
 
 	availableSecret *v1.Secret
 }
@@ -79,6 +81,7 @@ func (i *fakeImplementer) Update(obj *k8s.GenericResource) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 	i.updated = obj
+	i.updates = append(i.updates, obj)
 	return nil
 }
 

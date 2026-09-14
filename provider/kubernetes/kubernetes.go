@@ -112,6 +112,10 @@ type UpdatePlan struct {
 	groupApproval string
 	// id of the approval that approved this plan, empty when the plan needed no approval
 	approvalID string
+	// containers the plan updates
+	containers []types.RolloutContainer
+	// digest of a container that was pinned by digest before the update, ie: by a rollback
+	pinnedDigest string
 }
 
 func (p *UpdatePlan) String() string {
@@ -165,6 +169,8 @@ type Provider struct {
 
 	// follows the rollouts of approved updates
 	rollouts *rolloutWatcher
+	// apply the rollbacks requested through the approvals manager
+	rollbacksEnabled bool
 
 	events chan *types.Event
 	stop   chan struct{}
@@ -423,9 +429,15 @@ func (p *Provider) TrackedImages() ([]*types.TrackedImage, error) {
 		}
 		platforms, platformErr := p.platforms.Resolve(gr)
 		runningDigests := p.runningDigests.Resolve(gr)
+		// containers pinned by a rollback keep tracking the reference their update set
+		trackedReferences := trackedImageReferences(gr)
 
 		for _, img := range images {
-			ref, err := image.Parse(img)
+			reference := img
+			if tracked, ok := trackedReferences[img]; ok {
+				reference = tracked
+			}
+			ref, err := image.Parse(reference)
 			if err != nil {
 				log.WithFields(log.Fields{
 					"error":     err,
@@ -470,6 +482,9 @@ func (p *Provider) startInternal() error {
 		"event_buffer_size": cap(p.events),
 	}).Info("provider.kubernetes: starting event loop")
 
+	// rollbacks are applied in the event loop, so they never race with updates
+	rollbacks := p.subscribeRollbacks()
+
 	for {
 		select {
 		case event := <-p.events:
@@ -481,6 +496,8 @@ func (p *Provider) startInternal() error {
 					"tag":   event.Repository.Tag,
 				}).Error("provider.kubernetes: failed to process event")
 			}
+		case approval := <-rollbacks:
+			p.rollback(approval)
 		case <-p.stop:
 			log.Info("provider.kubernetes: got shutdown signal, stopping...")
 			return nil
@@ -577,6 +594,9 @@ func (p *Provider) applyPlan(plan *UpdatePlan) *k8s.GenericResource {
 	} else {
 		delete(annotations, types.KeelDigestAnnotation)
 	}
+
+	// containers pinned by a rollback go back to tracking their reference
+	releaseRollback(annotations, plan.containers)
 
 	resource.SetAnnotations(annotations)
 
@@ -711,6 +731,18 @@ func (p *Provider) createUpdatePlansForTrigger(repo *types.Repository, triggerNa
 			continue
 		}
 
+		if isHeldImage(resource, repo) {
+			log.WithFields(log.Fields{
+				"resource": resource.Identifier,
+				"image":    repo.String(),
+				"digest":   repo.Digest,
+			}).Info("provider.kubernetes: image was rolled back on this resource, not offering it again")
+			continue
+		}
+
+		// the containers as they are before the update, which rolling it back needs
+		candidates := matchingContainers(resource, repo)
+
 		updated, shouldUpdateDeployment, err := checkForUpdate(plc, repo, resource)
 		if err != nil {
 			log.WithFields(log.Fields{
@@ -724,6 +756,11 @@ func (p *Provider) createUpdatePlansForTrigger(repo *types.Repository, triggerNa
 
 		if shouldUpdateDeployment {
 			updated.CurrentDigest = p.currentDigest(resource, repo, updated)
+			recordUpdatedContainers(updated, candidates)
+			if updated.pinnedDigest != "" {
+				// a container pinned by digest, ie: by a rollback, runs the digest of its reference
+				updated.CurrentDigest = updated.pinnedDigest
+			}
 			if repo.PlatformVerified {
 				platforms, resolutionErr := p.platforms.Resolve(resource)
 				if resolutionErr != types.PlatformErrorNone || !types.PlatformsSupportAll(repo.Platforms, platforms) {

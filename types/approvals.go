@@ -79,6 +79,13 @@ type Approval struct {
 	MessageChannel   string `json:"messageChannel,omitempty"`
 	MessageTimestamp string `json:"messageTimestamp,omitempty"`
 
+	// RolledBackBy and RolledBackAt record who rolled the approved updates
+	// back, and when. RollbackFailure tells why a requested rollback was not
+	// applied.
+	RolledBackBy    string     `json:"rolledBackBy,omitempty"`
+	RolledBackAt    *time.Time `json:"rolledBackAt,omitempty"`
+	RollbackFailure string     `json:"rollbackFailure,omitempty"`
+
 	// Digest is used to verify that images are the ones that got the approvals.
 	// If digest doesn't match for the image, votes are reset.
 	Digest string `json:"digest"`

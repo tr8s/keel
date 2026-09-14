@@ -136,6 +136,14 @@ func (p *Provider) isApproved(event *types.Event, plan *UpdatePlan) (bool, error
 
 			p.describeChange(approval, plan, &event.Repository)
 
+			if isHeldRevision(plan.Resource, &event.Repository, approval.NewRevision) {
+				log.WithFields(log.Fields{
+					"resource": plan.Resource.Identifier,
+					"revision": approval.NewRevision,
+				}).Info("provider.kubernetes: revision was rolled back on this resource, not offering it again")
+				return false, nil
+			}
+
 			approval.Message = fmt.Sprintf("New image is available for resource %s/%s (%s).",
 				plan.Resource.Namespace,
 				plan.Resource.Name,

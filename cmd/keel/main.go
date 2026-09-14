@@ -337,6 +337,8 @@ func setupProviders(opts *ProviderOpts) (providers provider.Providers) {
 	k8sProvider.SetImageLabelsGetter(registry.New())
 	// report approved updates as failed when they do not roll out in time
 	k8sProvider.SetRolloutTimeout(opts.appConfig.Kubernetes.RolloutTimeout)
+	// roll approved updates back when approvers ask for it
+	k8sProvider.EnableRollbacks()
 	go func() {
 		err := k8sProvider.Start()
 		if err != nil {

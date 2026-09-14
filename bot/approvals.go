@@ -105,6 +105,15 @@ func (bm *BotManager) ProcessApprovalResponses(ctx context.Context, reply BotRep
 		case <-ctx.Done():
 			return nil
 		case resp := <-bm.approvalsRespCh:
+			if resp.Rollback {
+				if err := bm.processRollbackResponse(resp, reply); err != nil {
+					log.WithFields(log.Fields{
+						"error": err,
+						"user":  resp.User,
+					}).Error("bot.processApprovalResponses: failed to process rollback request")
+				}
+				continue
+			}
 			switch resp.Status {
 			case types.ApprovalStatusApproved:
 				err := bm.processApprovedResponse(resp, reply)
@@ -209,7 +218,31 @@ func ApprovalsResponse(approvalsManager approvals.Manager) string {
 	return buf.String()
 }
 
+// processRollbackResponse - request the rollback of the updates of an approval, recording who asked for it. The
+// same rules as approving apply: only responses from the approvals channel reach this point.
+func (bm *BotManager) processRollbackResponse(approvalResponse *ApprovalResponse, reply BotReplyApproval) error {
+	reference := strings.TrimSpace(approvalResponse.Text[len(RollbackResponseKeyword):])
+	if reference == "" {
+		return fmt.Errorf("rollback needs an approval identifier")
+	}
+
+	approval, err := bm.approvalsManager.RequestRollback(reference, approvalResponse.User)
+	if err != nil {
+		return err
+	}
+
+	return reply(approval)
+}
+
 func IsApproval(eventUser string, eventText string) (resp *ApprovalResponse, ok bool) {
+	if strings.HasPrefix(strings.ToLower(eventText), RollbackResponseKeyword) {
+		return &ApprovalResponse{
+			User:     eventUser,
+			Text:     eventText,
+			Rollback: true,
+		}, true
+	}
+
 	if strings.HasPrefix(strings.ToLower(eventText), ApprovalResponseKeyword) {
 		return &ApprovalResponse{
 			User:   eventUser,
