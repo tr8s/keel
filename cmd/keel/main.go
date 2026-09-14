@@ -335,6 +335,8 @@ func setupProviders(opts *ProviderOpts) (providers provider.Providers) {
 	}
 	// link approvals to the code change behind the new image when it is labelled
 	k8sProvider.SetImageLabelsGetter(registry.New())
+	// report approved updates as failed when they do not roll out in time
+	k8sProvider.SetRolloutTimeout(opts.appConfig.Kubernetes.RolloutTimeout)
 	go func() {
 		err := k8sProvider.Start()
 		if err != nil {

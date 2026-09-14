@@ -110,6 +110,8 @@ type UpdatePlan struct {
 
 	// identifier of the group approval that approved this plan, empty otherwise
 	groupApproval string
+	// id of the approval that approved this plan, empty when the plan needed no approval
+	approvalID string
 }
 
 func (p *UpdatePlan) String() string {
@@ -161,6 +163,9 @@ type Provider struct {
 
 	cache GenericResourceCache
 
+	// follows the rollouts of approved updates
+	rollouts *rolloutWatcher
+
 	events chan *types.Event
 	stop   chan struct{}
 }
@@ -180,6 +185,7 @@ func NewProvider(implementer Implementer, sender notification.Sender, approvalMa
 		events:          make(chan *types.Event, config.DefaultEventBufferSize),
 		stop:            make(chan struct{}),
 		sender:          sender,
+		rollouts:        newRolloutWatcher(),
 	}, nil
 }
 
@@ -607,6 +613,11 @@ func (p *Provider) applyPlan(plan *UpdatePlan) *k8s.GenericResource {
 			"kind":      resource.Kind(),
 			"namespace": resource.Namespace,
 		}).Warn("provider.kubernetes: got error while archiving approvals counter after successful update")
+	}
+
+	// approved updates report their rollout on the approval
+	if plan.approvalID != "" {
+		p.startRollout(plan)
 	}
 
 	var msg string

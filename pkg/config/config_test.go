@@ -28,7 +28,8 @@ func TestLoadDefaults(t *testing.T) {
 			Level: "info", Slack: SlackNotificationConfig{BotName: "keel"}, Hipchat: HipchatNotificationConfig{BotName: "keel"},
 			Mattermost: MattermostConfig{Username: "keel"}, Shoutrrr: ShoutrrrConfig{Timeout: "10s"}, Mail: MailConfig{SMTPPort: 25},
 		},
-		Bots: BotConfig{Slack: SlackBotConfig{BotName: "keel", ApprovalsChannel: "general"}, Hipchat: HipchatBotConfig{ApprovalsChannel: "general", ApprovalsBotName: "keel", ConnectionAttempts: 5}},
+		Bots:       BotConfig{Slack: SlackBotConfig{BotName: "keel", ApprovalsChannel: "general"}, Hipchat: HipchatBotConfig{ApprovalsChannel: "general", ApprovalsBotName: "keel", ConnectionAttempts: 5}},
+		Kubernetes: KubernetesConfig{RolloutTimeout: 10 * time.Minute},
 	}, cfg)
 }
 
@@ -103,6 +104,7 @@ func TestLoadMapsEveryTypedPath(t *testing.T) {
 		"MATTERMOST_ENDPOINT": "https://mattermost", "MATTERMOST_USERNAME": "matter-bot", "TEAMS_WEBHOOK_URL": "https://teams", "DISCORD_WEBHOOK_URL": "https://discord", "SHOUTRRR_URLS": "discord://token@id", "SHOUTRRR_TIMEOUT": "3s",
 		"MAIL_TO": "to@example.com", "MAIL_FROM": "from@example.com", "MAIL_SMTP_SERVER": "smtp.example.com", "MAIL_SMTP_PORT": "2525", "MAIL_SMTP_USER": "smtp-user", "MAIL_SMTP_PASS": "smtp-pass",
 		"BASIC_AUTH_USER": "admin", "BASIC_AUTH_PASSWORD": "secret", "AUTHENTICATED_WEBHOOKS": "true", "TOKEN_SECRET": "token-secret", "AUTH_MODE": "proxy", "AUTH_PROXY_USER_HEADER": "X-User", "AUTH_PROXY_LOGOUT_URL": "https://logout", "RESTRICTED_NAMESPACE": "production",
+		"APPROVAL_ROLLOUT_TIMEOUT": "4m",
 	}
 	for key, value := range values {
 		t.Setenv(key, value)
@@ -113,7 +115,7 @@ func TestLoadMapsEveryTypedPath(t *testing.T) {
 		Debug: true, Trigger: TriggerConfig{PubSub: true, PollScanInterval: 45 * time.Second, ProjectID: "project", ClusterName: "cluster"}, Storage: StorageConfig{DataDir: "/var/lib/keel"}, Providers: ProviderConfig{Helm3: true}, UI: UIConfig{Dir: "/ui"},
 		Notifications: NotificationConfig{Level: "warn", Webhook: WebhookConfig{Endpoint: "https://webhook"}, Slack: SlackNotificationConfig{BotToken: "xoxb-typed", BotName: "typed-bot", Channels: "one,two"}, Hipchat: HipchatNotificationConfig{Server: "https://hipchat", Token: "hip-token", BotName: "hip-notifier", Channels: "ops,dev"}, Mattermost: MattermostConfig{Endpoint: "https://mattermost", Username: "matter-bot"}, Teams: TeamsConfig{WebhookURL: "https://teams"}, Discord: DiscordConfig{WebhookURL: "https://discord"}, Shoutrrr: ShoutrrrConfig{URLs: "discord://token@id", Timeout: "3s"}, Mail: MailConfig{To: "to@example.com", From: "from@example.com", SMTPServer: "smtp.example.com", SMTPPort: 2525, SMTPUser: "smtp-user", SMTPPass: "smtp-pass"}},
 		Bots:          BotConfig{Slack: SlackBotConfig{BotToken: "xoxb-typed", AppToken: "xapp-typed", BotName: "typed-bot", ApprovalsChannel: "approvals", HideApprovalCommands: true, CompactApprovals: true}, Hipchat: HipchatBotConfig{ApprovalsChannel: "hip-approvals", ApprovalsUserName: "hip-user", ApprovalsBotName: "hip-bot", ApprovalsPassword: "hip-pass", ConnectionAttempts: 4}},
-		Auth:          AuthConfig{BasicUser: "admin", BasicPassword: "secret", AuthenticatedWebhooks: true, TokenSecret: "token-secret", Mode: "proxy", ProxyUserHeader: "X-User", ProxyLogoutURL: "https://logout"}, Kubernetes: KubernetesConfig{RestrictedNamespace: "production"},
+		Auth:          AuthConfig{BasicUser: "admin", BasicPassword: "secret", AuthenticatedWebhooks: true, TokenSecret: "token-secret", Mode: "proxy", ProxyUserHeader: "X-User", ProxyLogoutURL: "https://logout"}, Kubernetes: KubernetesConfig{RestrictedNamespace: "production", RolloutTimeout: 4 * time.Minute},
 	}, cfg)
 }
 

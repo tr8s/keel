@@ -129,6 +129,10 @@ func Run(appConfig config.Config, k8sImplementer kubernetes.Implementer, approva
 }
 
 func (bm *BotManager) SetupBot(botName string, bot Bot) {
+	if aware, ok := bot.(ApprovalsManagerAware); ok {
+		aware.SetApprovalsManager(bm.approvalsManager)
+	}
+
 	ctx, cancel := context.WithCancel(context.Background())
 	err := bot.Start(ctx)
 	if err != nil {
@@ -144,6 +148,9 @@ func (bm *BotManager) SetupBot(botName string, bot Bot) {
 		go bm.ProcessApprovalResponses(ctx, bot.ReplyToApproval)
 		go bm.SubscribeForApprovals(ctx, bot.RequestApproval)
 		go bm.SubscribeForApprovalUpdates(ctx, bot.ReplyToApproval)
+		if notifier, ok := bot.(RolloutFailureNotifier); ok {
+			go bm.SubscribeForRolloutFailures(ctx, notifier.NotifyRolloutFailure)
+		}
 	}
 }
 

@@ -20,6 +20,7 @@ var environmentVariables = []string{
 	"TEAMS_WEBHOOK_URL", "DISCORD_WEBHOOK_URL", "SHOUTRRR_URLS", "SHOUTRRR_TIMEOUT", "MAIL_TO", "MAIL_FROM", "MAIL_SMTP_SERVER",
 	"MAIL_SMTP_PORT", "MAIL_SMTP_USER", "MAIL_SMTP_PASS", "BASIC_AUTH_USER", "BASIC_AUTH_PASSWORD", "AUTHENTICATED_WEBHOOKS",
 	"TOKEN_SECRET", "AUTH_MODE", "AUTH_PROXY_USER_HEADER", "AUTH_PROXY_LOGOUT_URL", "RESTRICTED_NAMESPACE",
+	"APPROVAL_ROLLOUT_TIMEOUT",
 }
 
 // Config contains Keel's application configuration loaded from environment variables.
@@ -176,6 +177,10 @@ type AuthConfig struct {
 // KubernetesConfig controls the scope of Kubernetes resources watched by Keel.
 type KubernetesConfig struct {
 	RestrictedNamespace string `envconfig:"RESTRICTED_NAMESPACE"`
+	// RolloutTimeout is how long the rollout of an approved update may take
+	// before it is reported as failed, when the workload does not report the
+	// failure itself.
+	RolloutTimeout time.Duration `envconfig:"APPROVAL_ROLLOUT_TIMEOUT" default:"10m"`
 }
 
 // Load reads configuration from environment variables.

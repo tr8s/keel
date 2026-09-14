@@ -16,6 +16,41 @@ import (
 type BotRequestApproval func(req *types.Approval) error
 type BotReplyApproval func(approval *types.Approval) error
 
+// ApprovalsManagerAware is implemented by bots that use the approvals manager directly, ie: to record where they
+// posted approval messages
+type ApprovalsManagerAware interface {
+	SetApprovalsManager(manager approvals.Manager)
+}
+
+// RolloutFailureNotifier is implemented by bots that notify the approvers when an approved update fails to roll out
+type RolloutFailureNotifier interface {
+	NotifyRolloutFailure(approval *types.Approval) error
+}
+
+// SubscribeForRolloutFailures - notify about approved updates that failed to roll out
+func (bm *BotManager) SubscribeForRolloutFailures(ctx context.Context, notify BotReplyApproval) error {
+	failedCh, err := bm.approvalsManager.SubscribeRolloutFailed(ctx)
+	if err != nil {
+		log.Errorf("bot.subscribeForRolloutFailures(): %s", err.Error())
+		return err
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case a := <-failedCh:
+			err = notify(a)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"error":    err,
+					"approval": a.Identifier,
+				}).Error("bot.subscribeForRolloutFailures: rollout failure notification failed")
+			}
+		}
+	}
+}
+
 func (bm *BotManager) SubscribeForApprovals(ctx context.Context, approval BotRequestApproval) error {
 	approvalsCh, err := bm.approvalsManager.Subscribe(ctx)
 	if err != nil {

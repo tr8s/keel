@@ -15,7 +15,12 @@ import (
 // Request - request approval
 func (b *Bot) RequestApproval(req *types.Approval) error {
 	blocks, text := b.createApprovalMessage("Approval required! :mega:", req)
-	return b.postApprovalMessageBlock(req.ID, blocks, text)
+	channel, timestamp, err := b.postApprovalMessageBlock(req.ID, blocks, text)
+	if err != nil {
+		return err
+	}
+	b.recordApprovalMessage(req.ID, channel, timestamp)
+	return nil
 }
 
 func (b *Bot) ReplyToApproval(approval *types.Approval) error {
@@ -33,7 +38,7 @@ func (b *Bot) ReplyToApproval(approval *types.Approval) error {
 	}
 
 	blocks, text := b.createApprovalMessage(title, approval)
-	b.upsertApprovalMessage(approval.ID, blocks, text)
+	b.upsertApprovalMessage(approval, blocks, text)
 	return nil
 }
 

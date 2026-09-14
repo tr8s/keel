@@ -160,5 +160,9 @@ func (p *Provider) isApproved(event *types.Event, plan *UpdatePlan) (bool, error
 	// 	"new":      event.Repository.Digest,
 	// }).Info("digests match")
 
-	return existing.Status() == types.ApprovalStatusApproved, nil
+	approved := existing.Status() == types.ApprovalStatusApproved
+	if approved {
+		plan.approvalID = existing.ID
+	}
+	return approved, nil
 }
