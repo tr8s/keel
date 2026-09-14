@@ -101,6 +101,10 @@ const KeelCommitSubjectLabel = "sh.keel.commit.subject"
 // the image was built from
 const KeelCommitAuthorLabel = "sh.keel.commit.author"
 
+// KeelChangeMigrationsLabel - image label set to "true" when the change the
+// image was built from includes a database migration
+const KeelChangeMigrationsLabel = "sh.keel.change.migrations"
+
 func init() {
 	value, found := os.LookupEnv("POLL_DEFAULTSCHEDULE")
 	if found {
