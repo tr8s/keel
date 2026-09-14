@@ -171,6 +171,9 @@ type Provider struct {
 	rollouts *rolloutWatcher
 	// apply the rollbacks requested through the approvals manager
 	rollbacksEnabled bool
+	// resume the rollouts and rollbacks in progress before a restart, after the delay
+	resumeEnabled bool
+	resumeDelay   time.Duration
 
 	events chan *types.Event
 	stop   chan struct{}
@@ -485,6 +488,12 @@ func (p *Provider) startInternal() error {
 	// rollbacks are applied in the event loop, so they never race with updates
 	rollbacks := p.subscribeRollbacks()
 
+	// rollouts in progress before a restart are resumed once the resources had time to load
+	var resume <-chan time.Time
+	if p.resumeEnabled && p.approvalManager != nil {
+		resume = time.After(p.resumeDelay)
+	}
+
 	for {
 		select {
 		case event := <-p.events:
@@ -498,6 +507,8 @@ func (p *Provider) startInternal() error {
 			}
 		case approval := <-rollbacks:
 			p.rollback(approval)
+		case <-resume:
+			p.resumeRollouts()
 		case <-p.stop:
 			log.Info("provider.kubernetes: got shutdown signal, stopping...")
 			return nil

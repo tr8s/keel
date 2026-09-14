@@ -11,6 +11,13 @@ metadata:
     heritage: {{ .Release.Service }}
 spec:
   replicas: 1
+{{- with .Values.deploymentStrategy }}
+  strategy:
+{{ toYaml . | indent 4 }}
+  {{- if eq (.type | default "") "Recreate" }}
+    rollingUpdate: null
+  {{- end }}
+{{- end }}
   selector:
     matchLabels:
       app: {{ template "keel.name" . }}

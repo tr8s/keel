@@ -56,6 +56,8 @@ type Manager interface {
 	RequestRollback(reference, actor string) (*types.Approval, error)
 	// SubscribeRollback - is used by providers to get the rollbacks they apply
 	SubscribeRollback(ctx context.Context) (<-chan *types.Approval, error)
+	// ListRollouts lists the approvals, archived or not, that recorded rollouts
+	ListRollouts() ([]*types.Approval, error)
 
 	// Increases Approval votes by 1
 	Approve(identifier, voter string) (*types.Approval, error)
