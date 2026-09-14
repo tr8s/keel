@@ -25,7 +25,9 @@ Resources without approvals are not followed.
 ## Roll back
 
 The live and failed states of the approval message offer **Roll back…** in the overflow menu (⋯) of the rollout
-line, so it is not clicked by accident. The failure reply in the thread offers a visible **Roll back** button, since
+line, so it is not clicked by accident. The menu also offers **View changes**, which opens the comparison of the
+running and the new revision (or the new commit) and does nothing in Keel. When there is no link to the changes,
+for example with an unknown source host, the message shows a **Roll back** button instead of the menu. The failure reply in the thread offers a visible **Roll back** button, since
 speed matters there. Both ask for confirmation first, and `@keel rollback <approval identifier>` does the same. The
 same rule as approving applies: the request must come from the approvals channel. Keel records who rolled back on the
 approval and in the audit log. Neither the menu nor the button is offered when the previous image of a resource is
