@@ -71,6 +71,22 @@ The volume is ReadWriteOnce, so with the default RollingUpdate strategy an upgra
 old one still holds the volume, and the new pod never starts. For an existing install, upgrade with
 `--set deploymentStrategy.type=Recreate`; the chart also clears the rollingUpdate settings the Deployment has.
 
+The Keel image runs as uid and gid 666, while a new volume is usually owned by root. Keel then can not create its
+database, the startup probe fails and the container restarts forever. The log shows:
+
+```text
+sql store connector: can't reach DB, waiting error="unable to open database file: no such file or directory" uri=/data/keel.db
+```
+
+Keel also logs `data directory /data is not writable by uid 666: set podSecurityContext.fsGroup ...` at startup. The
+chart sets `podSecurityContext.fsGroup: 666` when persistence is enabled and `fsGroup` is not set, which lets the
+Keel group write to the volume. With your own manifests or an older chart, set it yourself:
+
+```yaml
+podSecurityContext:
+  fsGroup: 666
+```
+
 When Keel starts, it waits for its resources to load and then resumes the rollouts that were in progress and applies
 the rollbacks that were requested but not applied. A rollout that finished or timed out meanwhile is closed on its
 first check, so no message keeps showing a rollout in progress.

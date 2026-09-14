@@ -37,7 +37,12 @@ spec:
       imagePullSecrets:
 {{- toYaml . | nindent 8 }}
 {{- end }}
-{{- with .Values.podSecurityContext }}
+{{- $podSecurityContext := deepCopy (default (dict) .Values.podSecurityContext) }}
+{{- if and .Values.persistence.enabled (not (hasKey $podSecurityContext "fsGroup")) }}
+{{- /* the Keel image runs as uid and gid 666 and a new volume is owned by root: let the Keel group write to it */}}
+{{- $_ := set $podSecurityContext "fsGroup" 666 }}
+{{- end }}
+{{- with $podSecurityContext }}
       securityContext:
 {{- toYaml . | nindent 8 }}
 {{- end }}
