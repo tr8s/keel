@@ -46,7 +46,7 @@ func (b *Bot) ReplyToApproval(approval *types.Approval) error {
 // text (empty for the default layout, which has none)
 func (b *Bot) createApprovalMessage(title string, req *types.Approval) (slack.Blocks, string) {
 	if b.compactApprovals {
-		return createCompactBlockMessage(req)
+		return createCompactBlockMessageWithNote(req, b.migrationNote)
 	}
 	return createBlockMessage(title, b.name, !b.hideApprovalCommands, req), ""
 }

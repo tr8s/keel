@@ -38,6 +38,9 @@ type Bot struct {
 	// show approval messages in the compact layout
 	compactApprovals bool
 
+	// what approvers do about a database migration, the default note when empty
+	migrationNote string
+
 	// records where approval messages were posted, when the bot manager provides it
 	approvalMessages approvalMessageRecorder
 
@@ -71,6 +74,7 @@ func (b *Bot) Configure(appConfig config.Config, approvalsRespCh chan *bot.Appro
 	b.approvalsChannel = strings.TrimPrefix(cfg.ApprovalsChannel, "#")
 	b.hideApprovalCommands = cfg.HideApprovalCommands
 	b.compactApprovals = cfg.CompactApprovals
+	b.migrationNote = strings.TrimSpace(cfg.ApprovalMigrationNote)
 	api := slack.New(cfg.BotToken, slack.OptionDebug(appConfig.Debug), slack.OptionAppLevelToken(cfg.AppToken))
 	b.slackSocket = socketmode.New(api, socketmode.OptionDebug(appConfig.Debug))
 	b.approvalsRespCh = approvalsRespCh

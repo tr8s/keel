@@ -18,11 +18,17 @@ const maxCommitSubjectLength = 200
 // slackUserID - Slack user identifiers, which the Slack bot records as voters
 var slackUserID = regexp.MustCompile(`^[UW][A-Z0-9]{6,}$`)
 
-// createCompactBlockMessage - build a compact approval message focused on the change being deployed: the
+// createCompactBlockMessage - the compact approval message with the default migration note
+func createCompactBlockMessage(req *types.Approval) (slack.Blocks, string) {
+	return createCompactBlockMessageWithNote(req, "")
+}
+
+// createCompactBlockMessageWithNote - build a compact approval message focused on the change being deployed: the
 // workload and its commit, the commit subject, and a context line with the namespace, the author, a link to
 // the changes and the votes when more than one is required. Pending approvals get the approve and reject
-// buttons, decided or expired ones their outcome. It also returns the notification text of the message.
-func createCompactBlockMessage(req *types.Approval) (slack.Blocks, string) {
+// buttons, decided or expired ones their outcome. The migration note tells approvers what to do about a database
+// migration, the default note when empty. It also returns the notification text of the message.
+func createCompactBlockMessageWithNote(req *types.Approval, migrationNote string) (slack.Blocks, string) {
 	namespace, name := approvalWorkload(req)
 	members := memberNames(req, name)
 	reference := shortChangeReference(req)
@@ -57,7 +63,7 @@ func createCompactBlockMessage(req *types.Approval) (slack.Blocks, string) {
 
 	if req.IncludesMigration {
 		blocks = append(blocks, slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", ":warning: Includes a database migration. Keel does not run migrations; apply it before approving.", false, false),
+			slack.NewTextBlockObject("mrkdwn", migrationWarningText(migrationNote), false, false),
 			nil,
 			nil,
 		))
