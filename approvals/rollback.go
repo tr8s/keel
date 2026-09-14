@@ -17,6 +17,22 @@ func (m *DefaultManager) SubscribeRollback(ctx context.Context) (<-chan *types.A
 // reference is the id or the identifier of the approval; an identifier refers to its latest approval that
 // deployed something. The providers subscribed to rollbacks roll the resources back.
 func (m *DefaultManager) RequestRollback(reference, actor string) (*types.Approval, error) {
+	return m.requestRollback(reference, actor, "")
+}
+
+// RequestConfirmedRollback - request a rollback that a user confirmed for what the confirmation showed. It is refused
+// with types.ErrRollbackChanged when the rollback fingerprint of the approval changed since, ie: the approval was
+// rolled back or rolled out again.
+func (m *DefaultManager) RequestConfirmedRollback(reference, actor, fingerprint string) (*types.Approval, error) {
+	return m.requestRollback(reference, actor, fingerprint)
+}
+
+// GetByID - get the approval with the id, archived or not
+func (m *DefaultManager) GetByID(id string) (*types.Approval, error) {
+	return m.getByID(id)
+}
+
+func (m *DefaultManager) requestRollback(reference, actor, fingerprint string) (*types.Approval, error) {
 	m.mu.Lock()
 	approval, err := m.rollbackCandidate(reference)
 	if err != nil {
@@ -26,6 +42,10 @@ func (m *DefaultManager) RequestRollback(reference, actor string) (*types.Approv
 	if err := approval.RollbackError(); err != nil {
 		m.mu.Unlock()
 		return nil, err
+	}
+	if fingerprint != "" && approval.RollbackFingerprint() != fingerprint {
+		m.mu.Unlock()
+		return nil, types.ErrRollbackChanged
 	}
 
 	now := time.Now()

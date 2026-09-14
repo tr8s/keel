@@ -98,3 +98,54 @@ func TestProcessRollbackResponse(t *testing.T) {
 		t.Errorf("expected a second rollback to be refused, got %v", err)
 	}
 }
+
+func TestProcessConfirmedRollbackResponse(t *testing.T) {
+	am := newApprovalsManager(t)
+	err := am.Create(&types.Approval{
+		Provider:      types.ProviderTypeKubernetes,
+		Identifier:    "group/trackeid/trackeid:e3a9113",
+		NewRevision:   "e3a9113",
+		VotesRequired: 1,
+		VotesReceived: 1,
+		Deadline:      time.Now().Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("failed to create approval: %s", err)
+	}
+	created, _ := am.Get("group/trackeid/trackeid:e3a9113")
+	_, err = am.UpdateRollout(created.ID, func(approval *types.Approval) bool {
+		approval.SetRolloutTarget(types.RolloutTarget{
+			Identifier: "deployment/trackeid/trackeid-api",
+			Name:       "trackeid-api",
+			Marker:     "update",
+			State:      types.RolloutStateLive,
+			Containers: []types.RolloutContainer{{Name: "api", Image: "registry.example.com/tr8s/trackeid-api:main", PreviousDigest: "sha256:before"}},
+		})
+		return true
+	})
+	if err != nil {
+		t.Fatalf("failed to record the rollout: %s", err)
+	}
+
+	bm := &BotManager{approvalsManager: am}
+	reply := func(*types.Approval) error { return nil }
+
+	// a confirmation shown for another state of the rollout is refused
+	resp, _ := IsApproval("U02ROLLBACK", "rollback "+created.ID+" 0000000000000000")
+	if err := bm.processRollbackResponse(resp, reply); !errors.Is(err, types.ErrRollbackChanged) {
+		t.Fatalf("expected a stale confirmation to be refused, got %v", err)
+	}
+	if approval, _ := am.GetByID(created.ID); approval.RolledBackBy != "" {
+		t.Fatalf("expected nothing to be rolled back, got %q", approval.RolledBackBy)
+	}
+
+	// the confirmation of the current state rolls back and records who confirmed
+	current, _ := am.GetByID(created.ID)
+	resp, _ = IsApproval("U02ROLLBACK", "rollback "+created.ID+" "+current.RollbackFingerprint())
+	if err := bm.processRollbackResponse(resp, reply); err != nil {
+		t.Fatalf("failed to roll back: %s", err)
+	}
+	if approval, _ := am.GetByID(created.ID); approval.RolledBackBy != "U02ROLLBACK" || approval.RolledBackAt == nil {
+		t.Errorf("expected the rollback by U02ROLLBACK to be recorded, got %q", approval.RolledBackBy)
+	}
+}
