@@ -125,6 +125,8 @@ func (p *Provider) isApproved(event *types.Event, plan *UpdatePlan) (bool, error
 				Deadline:       time.Now().Add(time.Duration(deadline) * time.Hour),
 			}
 
+			p.describeChange(approval, plan, &event.Repository)
+
 			approval.Message = fmt.Sprintf("New image is available for resource %s/%s (%s).",
 				plan.Resource.Namespace,
 				plan.Resource.Name,

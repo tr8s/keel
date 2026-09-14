@@ -333,6 +333,8 @@ func setupProviders(opts *ProviderOpts) (providers provider.Providers) {
 			"error": err,
 		}).Fatal("main.setupProviders: failed to create kubernetes provider")
 	}
+	// link approvals to the code change behind the new image when it is labelled
+	k8sProvider.SetImageLabelsGetter(registry.New())
 	go func() {
 		err := k8sProvider.Start()
 		if err != nil {

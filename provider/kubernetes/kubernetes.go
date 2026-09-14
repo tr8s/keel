@@ -153,6 +153,9 @@ type Provider struct {
 
 	approvalManager approvals.Manager
 
+	// optional, links approvals to the code change behind the new image
+	imageLabels ImageLabelsGetter
+
 	cache GenericResourceCache
 
 	events chan *types.Event
