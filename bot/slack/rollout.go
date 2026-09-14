@@ -143,12 +143,17 @@ func rollbackConfirmation(req *types.Approval, group string) *slack.Confirmation
 		names = append(names, shortMemberName(target.Name, group))
 	}
 
+	text := fmt.Sprintf("Sets %s back to %s. Database changes are not rolled back.",
+		escapeMrkdwn(strings.Join(names, ", ")),
+		escapeMrkdwn(previousReference(req)),
+	)
+	if req.IncludesMigration {
+		text += " This change included a database migration; rolling back the app does not undo it."
+	}
+
 	return slack.NewConfirmationBlockObject(
 		slack.NewTextBlockObject("plain_text", "Roll back?", false, false),
-		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("Sets %s back to %s. Database changes are not rolled back.",
-			escapeMrkdwn(strings.Join(names, ", ")),
-			escapeMrkdwn(previousReference(req)),
-		), false, false),
+		slack.NewTextBlockObject("mrkdwn", text, false, false),
 		slack.NewTextBlockObject("plain_text", "Roll back", false, false),
 		slack.NewTextBlockObject("plain_text", "Cancel", false, false),
 	)

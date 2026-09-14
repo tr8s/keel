@@ -31,6 +31,11 @@ same rule as approving applies: the request must come from the approvals channel
 approval and in the audit log. Neither the menu nor the button is offered when the previous image of a resource is
 unknown, once the update was rolled back, or on a superseded approval.
 
+When the new image of any workload carries the label `sh.keel.change.migrations=true`, the approval message warns
+that the change includes a database migration, which Keel does not run and which has to be applied before
+approving. The rollback confirmation then also says that rolling back the app does not undo the migration. Without
+the label, or with `false`, there is no warning.
+
 A rollback sets every resource updated from the approval back to the image it ran before, pinned by digest
 (`registry/repository@sha256:...`). Pinning matters with a moving tag and `imagePullPolicy: Always`: restarting pods
 on the tag would pull the rolled back image again. **Database changes, such as migrations, are not rolled back.**

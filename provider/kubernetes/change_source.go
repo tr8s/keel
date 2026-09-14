@@ -65,6 +65,7 @@ func (p *Provider) describeChange(approval *types.Approval, plan *UpdatePlan, re
 
 	approval.CommitSubject = newLabels[types.KeelCommitSubjectLabel]
 	approval.CommitAuthor = newLabels[types.KeelCommitAuthorLabel]
+	approval.IncludesMigration = newLabels[types.KeelChangeMigrationsLabel] == "true"
 
 	approval.NewRevision = newLabels[types.OCIImageRevisionLabel]
 	if approval.NewRevision == "" {

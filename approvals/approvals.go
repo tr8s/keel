@@ -344,6 +344,11 @@ func (m *DefaultManager) requestGroupApproval(r *types.Approval, member types.Ap
 
 	if err == nil && !isStaleGroupApproval(r, existing, member) {
 		changed := existing.SetMember(member)
+		// a migration in the image of any member concerns the whole change
+		if r.IncludesMigration && !existing.IncludesMigration {
+			existing.IncludesMigration = true
+			changed = true
+		}
 		if existing.Status() == types.ApprovalStatusPending && r.VotesRequired > existing.VotesRequired {
 			existing.VotesRequired = r.VotesRequired
 			changed = true

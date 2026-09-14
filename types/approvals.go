@@ -60,6 +60,10 @@ type Approval struct {
 	CommitSubject string `json:"commitSubject,omitempty"`
 	CommitAuthor  string `json:"commitAuthor,omitempty"`
 
+	// IncludesMigration is set when the new image of a workload carries the
+	// label sh.keel.change.migrations=true
+	IncludesMigration bool `json:"includesMigration,omitempty"`
+
 	// Group, Members and SupersededBy are set on the approval shared by the
 	// workloads of an approval group (keel.sh/approvalGroup) that update to
 	// the same change. Group is "<namespace>/<group>", Members are the

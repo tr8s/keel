@@ -49,6 +49,14 @@ func createCompactBlockMessage(req *types.Approval) (slack.Blocks, string) {
 		))
 	}
 
+	if req.IncludesMigration {
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", ":warning: Includes a database migration. Keel does not run migrations; apply it before approving.", false, false),
+			nil,
+			nil,
+		))
+	}
+
 	var details []string
 	if namespace != "" {
 		details = append(details, escapeMrkdwn(namespace))
