@@ -63,6 +63,9 @@ func (p *Provider) describeChange(approval *types.Approval, plan *UpdatePlan, re
 		return
 	}
 
+	approval.CommitSubject = newLabels[types.KeelCommitSubjectLabel]
+	approval.CommitAuthor = newLabels[types.KeelCommitAuthorLabel]
+
 	approval.NewRevision = newLabels[types.OCIImageRevisionLabel]
 	if approval.NewRevision == "" {
 		log.WithFields(log.Fields{

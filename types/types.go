@@ -89,6 +89,14 @@ const OCIImageSourceLabel = "org.opencontainers.image.source"
 // source control revision the image was built from
 const OCIImageRevisionLabel = "org.opencontainers.image.revision"
 
+// KeelCommitSubjectLabel - image label holding the first line of the message
+// of the commit the image was built from
+const KeelCommitSubjectLabel = "sh.keel.commit.subject"
+
+// KeelCommitAuthorLabel - image label holding the author name of the commit
+// the image was built from
+const KeelCommitAuthorLabel = "sh.keel.commit.author"
+
 func init() {
 	value, found := os.LookupEnv("POLL_DEFAULTSCHEDULE")
 	if found {

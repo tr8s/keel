@@ -12,13 +12,22 @@ import (
 	"github.com/slack-go/slack"
 )
 
-// renderBlocks - serialize blocks the way they are sent to Slack, keeping <, > and & readable
+// renderBlocks - serialize blocks the way they are sent to Slack, keeping <, > and & readable. Some block
+// types marshal their elements with HTML escaping, so the JSON is decoded and encoded again without it.
 func renderBlocks(t *testing.T, blocks slack.Blocks) string {
 	t.Helper()
+	raw, err := json.Marshal(blocks.BlockSet)
+	if err != nil {
+		t.Fatalf("failed to encode blocks: %s", err)
+	}
+	var decoded interface{}
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("failed to decode blocks: %s", err)
+	}
 	var buf bytes.Buffer
 	encoder := json.NewEncoder(&buf)
 	encoder.SetEscapeHTML(false)
-	if err := encoder.Encode(blocks.BlockSet); err != nil {
+	if err := encoder.Encode(decoded); err != nil {
 		t.Fatalf("failed to encode blocks: %s", err)
 	}
 	return buf.String()

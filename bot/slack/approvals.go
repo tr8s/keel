@@ -14,10 +14,8 @@ import (
 
 // Request - request approval
 func (b *Bot) RequestApproval(req *types.Approval) error {
-	return b.postApprovalMessageBlock(
-		req.ID,
-		createBlockMessage("Approval required! :mega:", b.name, !b.hideApprovalCommands, req),
-	)
+	blocks, text := b.createApprovalMessage("Approval required! :mega:", req)
+	return b.postApprovalMessageBlock(req.ID, blocks, text)
 }
 
 func (b *Bot) ReplyToApproval(approval *types.Approval) error {
@@ -31,8 +29,18 @@ func (b *Bot) ReplyToApproval(approval *types.Approval) error {
 		title = "Change approved! :tada:"
 	}
 
-	b.upsertApprovalMessage(approval.ID, createBlockMessage(title, b.name, !b.hideApprovalCommands, approval))
+	blocks, text := b.createApprovalMessage(title, approval)
+	b.upsertApprovalMessage(approval.ID, blocks, text)
 	return nil
+}
+
+// createApprovalMessage - build the approval message in the configured layout, along with its notification
+// text (empty for the default layout, which has none)
+func (b *Bot) createApprovalMessage(title string, req *types.Approval) (slack.Blocks, string) {
+	if b.compactApprovals {
+		return createCompactBlockMessage(req)
+	}
+	return createBlockMessage(title, b.name, !b.hideApprovalCommands, req), ""
 }
 
 func createBlockMessage(title string, botName string, showCommands bool, req *types.Approval) slack.Blocks {
@@ -107,41 +115,44 @@ func createBlockMessage(title string, botName string, showCommands bool, req *ty
 	}
 
 	if req.VotesReceived < req.VotesRequired && !req.Expired() && !req.Rejected {
-		approveButton := slack.NewButtonBlockElement(
-			bot.ApprovalResponseKeyword,
-			req.Identifier,
-			slack.NewTextBlockObject(
-				"plain_text",
-				"Approve",
-				true,
-				false,
-			),
-		)
-		approveButton.Style = slack.StylePrimary
-
-		rejectButton := slack.NewButtonBlockElement(
-			bot.RejectResponseKeyword,
-			req.Identifier,
-			slack.NewTextBlockObject(
-				"plain_text",
-				"Reject",
-				true,
-				false,
-			),
-		)
-		rejectButton.Style = slack.StyleDanger
-
-		actionBlock := slack.NewActionBlock("", approveButton, rejectButton)
-
 		blocks = append(
 			blocks,
 			slack.NewDividerBlock(),
-			actionBlock,
+			createApprovalButtons(req.Identifier),
 		)
 	}
 	return slack.Blocks{
 		BlockSet: blocks,
 	}
+}
+
+// createApprovalButtons - the approve and reject buttons of an approval request
+func createApprovalButtons(identifier string) *slack.ActionBlock {
+	approveButton := slack.NewButtonBlockElement(
+		bot.ApprovalResponseKeyword,
+		identifier,
+		slack.NewTextBlockObject(
+			"plain_text",
+			"Approve",
+			true,
+			false,
+		),
+	)
+	approveButton.Style = slack.StylePrimary
+
+	rejectButton := slack.NewButtonBlockElement(
+		bot.RejectResponseKeyword,
+		identifier,
+		slack.NewTextBlockObject(
+			"plain_text",
+			"Reject",
+			true,
+			false,
+		),
+	)
+	rejectButton.Style = slack.StyleDanger
+
+	return slack.NewActionBlock("", approveButton, rejectButton)
 }
 
 // createCommandBlocks - list the supported bot commands, as returned by the help command

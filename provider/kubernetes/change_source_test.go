@@ -48,16 +48,25 @@ func TestApprovalDescribesCodeChange(t *testing.T) {
 		wantSource      string
 		wantCurrentRev  string
 		wantNewRevision string
+		wantSubject     string
+		wantAuthor      string
 	}{
 		{
 			name: "both revisions known",
 			getter: &fakeImageLabels{labels: map[string]map[string]string{
-				newDigest:     {types.OCIImageSourceLabel: source, types.OCIImageRevisionLabel: newRevision},
+				newDigest: {
+					types.OCIImageSourceLabel:    source,
+					types.OCIImageRevisionLabel:  newRevision,
+					types.KeelCommitSubjectLabel: "Label images with their commit and source",
+					types.KeelCommitAuthorLabel:  "Tim Brandin",
+				},
 				currentDigest: {types.OCIImageSourceLabel: source + ".git", types.OCIImageRevisionLabel: currentRevision},
 			}},
 			wantSource:      source,
 			wantCurrentRev:  currentRevision,
 			wantNewRevision: newRevision,
+			wantSubject:     "Label images with their commit and source",
+			wantAuthor:      "Tim Brandin",
 		},
 		{
 			name: "running image not found",
@@ -124,6 +133,9 @@ func TestApprovalDescribesCodeChange(t *testing.T) {
 				t.Errorf("got source %q, revisions %q -> %q, want %q, %q -> %q",
 					approval.SourceURL, approval.CurrentRevision, approval.NewRevision,
 					tt.wantSource, tt.wantCurrentRev, tt.wantNewRevision)
+			}
+			if approval.CommitSubject != tt.wantSubject || approval.CommitAuthor != tt.wantAuthor {
+				t.Errorf("got commit %q by %q, want %q by %q", approval.CommitSubject, approval.CommitAuthor, tt.wantSubject, tt.wantAuthor)
 			}
 			if !strings.Contains(approval.Message, "(main@sha256:5f55a51b -> main@sha256:62c200e9)") {
 				t.Errorf("unexpected approval message: %s", approval.Message)
