@@ -8,6 +8,7 @@ import (
 	"github.com/keel-hq/keel/approvals"
 	"github.com/keel-hq/keel/bot"
 	"github.com/keel-hq/keel/types"
+	"github.com/keel-hq/keel/util/scm"
 	"github.com/slack-go/slack"
 
 	log "github.com/sirupsen/logrus"
@@ -97,12 +98,16 @@ func rolloutBlocks(req *types.Approval, group string) []slack.Block {
 	}
 
 	if state := req.RolloutState(); (state == types.RolloutStateLive || state == types.RolloutStateFailed) && req.RollbackError() == nil {
-		// rolling back sits in the overflow menu of the rollout line, so it is not clicked by accident
-		return []slack.Block{slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", status, false, false),
-			nil,
-			slack.NewAccessory(createRollbackMenu(req, group)),
-		)}
+		// rolling back sits in the overflow menu of the rollout line, so it is not clicked by accident. The menu
+		// needs a second option, View changes, and without a link to the changes the button is shown instead.
+		if changes := changesURL(req); changes != "" {
+			return []slack.Block{slack.NewSectionBlock(
+				slack.NewTextBlockObject("mrkdwn", status, false, false),
+				nil,
+				slack.NewAccessory(createApprovalMenu(req, group, changes)),
+			)}
+		}
+		return []slack.Block{compactContext(status), createRollbackButton(req, group)}
 	}
 
 	blocks := []slack.Block{compactContext(status)}
@@ -112,12 +117,28 @@ func rolloutBlocks(req *types.Approval, group string) []slack.Block {
 	return blocks
 }
 
-// createRollbackMenu - the overflow menu of a live or failed rollout, with one option to roll back after confirming
-func createRollbackMenu(req *types.Approval, group string) *slack.OverflowBlockElement {
-	menu := slack.NewOverflowBlockElement(
-		bot.RollbackResponseKeyword,
-		slack.NewOptionBlockObject(req.ID, slack.NewTextBlockObject("plain_text", "Roll back…", false, false), nil),
+// changesURL - the link to the changes of an approval: the comparison of the running and the new revision, or else
+// the new commit. Empty when the source host is unknown or the revisions are not.
+func changesURL(req *types.Approval) string {
+	links := scm.ChangeLinks(req.SourceURL, req.CurrentRevision, req.NewRevision)
+	if links.Compare != "" {
+		return links.Compare
+	}
+	return links.Commit
+}
+
+// createApprovalMenu - the overflow menu of a live or failed rollout: View changes opens the link to the changes,
+// Roll back… rolls back after confirming. Each option carries its whole command, a link carries none.
+func createApprovalMenu(req *types.Approval, group, changes string) *slack.OverflowBlockElement {
+	view := slack.NewOptionBlockObject(viewChangesValue, slack.NewTextBlockObject("plain_text", "View changes", false, false), nil)
+	view.URL = changes
+	rollback := slack.NewOptionBlockObject(
+		bot.RollbackResponseKeyword+" "+req.ID,
+		slack.NewTextBlockObject("plain_text", "Roll back…", false, false),
+		nil,
 	)
+
+	menu := slack.NewOverflowBlockElement(approvalMenuActionID, view, rollback)
 	menu.Confirm = rollbackConfirmation(req, group)
 	return menu
 }
@@ -143,20 +164,43 @@ func rollbackConfirmation(req *types.Approval, group string) *slack.Confirmation
 		names = append(names, shortMemberName(target.Name, group))
 	}
 
-	text := fmt.Sprintf("Sets %s back to %s. Database changes are not rolled back.",
-		escapeMrkdwn(strings.Join(names, ", ")),
-		escapeMrkdwn(previousReference(req)),
-	)
-	if req.IncludesMigration {
-		text += " This change included a database migration; rolling back the app does not undo it."
-	}
-
 	return slack.NewConfirmationBlockObject(
 		slack.NewTextBlockObject("plain_text", "Roll back?", false, false),
-		slack.NewTextBlockObject("mrkdwn", text, false, false),
+		slack.NewTextBlockObject("mrkdwn", rollbackConfirmationText(req, names), false, false),
 		slack.NewTextBlockObject("plain_text", "Roll back", false, false),
 		slack.NewTextBlockObject("plain_text", "Cancel", false, false),
 	)
+}
+
+// maxConfirmTextLength - the longest text Slack accepts in a confirmation dialog
+const maxConfirmTextLength = 300
+
+// rollbackConfirmationText - what a rollback sets back and that database changes are not rolled back, naming as many
+// workloads as fit in a Slack confirmation dialog, ie: "Sets api, portal and 3 more back to 96df4af. ..."
+func rollbackConfirmationText(req *types.Approval, names []string) string {
+	var text string
+	for shown := len(names); shown >= 0; shown-- {
+		list := strings.Join(names[:shown], ", ")
+		if more := len(names) - shown; more > 0 {
+			if shown == 0 {
+				list = fmt.Sprintf("%d workloads", more)
+			} else {
+				list += fmt.Sprintf(" and %d more", more)
+			}
+		}
+
+		text = fmt.Sprintf("Sets %s back to %s. Database changes are not rolled back.",
+			escapeMrkdwn(list),
+			escapeMrkdwn(previousReference(req)),
+		)
+		if req.IncludesMigration {
+			text += " This change included a database migration; rolling back the app does not undo it."
+		}
+		if len([]rune(text)) <= maxConfirmTextLength {
+			break
+		}
+	}
+	return text
 }
 
 // previousReference - what a rollback sets the resources back to: the revision of the image that ran before when
