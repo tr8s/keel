@@ -1,0 +1,14 @@
+# Keel 0.22.3 with private approval channels (keel-hq/keel#209): rebuild only the
+# binary and drop it into the official image, which already carries the UI.
+FROM golang:1.26.5-alpine AS go-build
+WORKDIR /go/src/github.com/keel-hq/keel
+RUN apk add --no-cache git build-base musl-dev binutils-gold
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=1 go build -a -tags netgo \
+    -ldflags "-w -s -linkmode external -extldflags '-static' -X github.com/keel-hq/keel/version.Version=0.22.3-tr8s.1" \
+    -o /go/bin/keel ./cmd/keel
+
+FROM ghcr.io/keel-hq/keel:0.22.3
+COPY --from=go-build /go/bin/keel /bin/keel
