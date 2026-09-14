@@ -75,7 +75,7 @@ func createCompactBlockMessageWithNote(req *types.Approval, migrationNote string
 }
 
 // compactChangeBlocks - the blocks that describe a change in the compact layout: the header with the workload or
-// group and its commit, then the commit list or subject, then the migration warning
+// group, its environment label and its commit, then the commit list or subject, then the migration warning
 func compactChangeBlocks(req *types.Approval, name, migrationNote string) []slack.Block {
 	reference := shortChangeReference(req)
 	links := scm.ChangeLinks(req.SourceURL, req.CurrentRevision, req.NewRevision)
@@ -86,7 +86,7 @@ func compactChangeBlocks(req *types.Approval, name, migrationNote string) []slac
 	}
 	blocks := []slack.Block{
 		slack.NewSectionBlock(
-			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*%s* → %s", escapeMrkdwn(name), change), false, false),
+			slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("*%s* → %s", compactTitle(req, name), change), false, false),
 			nil,
 			nil,
 		),
@@ -118,6 +118,16 @@ func compactChangeBlocks(req *types.Approval, name, migrationNote string) []slac
 	return blocks
 }
 
+// compactTitle - the workload or group name, followed by the environment label when there is one,
+// ie: trackeid · prod
+func compactTitle(req *types.Approval, name string) string {
+	title := escapeMrkdwn(name)
+	if req.Environment != "" {
+		title += " · " + escapeMrkdwn(req.Environment)
+	}
+	return title
+}
+
 // compactDetails - the first details of the context line: the namespace, the members of a group and the author
 func compactDetails(req *types.Approval, namespace string, members []string) []string {
 	var details []string
@@ -133,11 +143,14 @@ func compactDetails(req *types.Approval, namespace string, members []string) []s
 	return details
 }
 
-// compactText - the notification text of a compact message, the verb followed by the workload or group, the
-// members of a group, the change and its headline. Slack escapes the text when it is sent.
-// ie: Deploy trackeid (api, portal) 8b4d196: Retry registry calls (+1)
+// compactText - the notification text of a compact message, the verb followed by the workload or group, its
+// environment label, the members of a group, the change and its headline. Slack escapes the text when it is sent.
+// ie: Deploy trackeid · prod (api, portal) 8b4d196: Retry registry calls (+1)
 func compactText(verb string, req *types.Approval, name string, members []string) string {
 	text := verb + " " + name
+	if req.Environment != "" {
+		text += " · " + req.Environment
+	}
 	if len(members) > 0 {
 		text += " (" + strings.Join(members, ", ") + ")"
 	}

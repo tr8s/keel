@@ -12,7 +12,7 @@ import (
 const defaultNoticeMigrationNote = "Keel does not run migrations."
 
 // createDeployNoticeMessage - the deploy notice of an update that needed no approval, in the compact approval layout
-// without votes or interactive elements: the workload or group with its commit, the commit
+// without votes or interactive elements: the workload or group with its environment label and commit, the commit
 // list or subject, the migration warning, a context line with the namespace, the members, the author and a link to
 // the changes, and the rollout status. It also returns the notification text of the message.
 func createDeployNoticeMessage(req *types.Approval, migrationNote string) (slack.Blocks, string) {

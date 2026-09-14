@@ -15,9 +15,9 @@ func (p *Provider) EnableDeployNotices() {
 	p.deployNotices = true
 }
 
-// prepareDeployNotice describes the deploy notice of a plan that needs no approval: the change, the channel (the
-// first keel.sh/notify channel, the default channel when there is none) and, for a resource of an approval group,
-// the group. The notice is recorded once the update is applied.
+// prepareDeployNotice describes the deploy notice of a plan that needs no approval: the change, the environment
+// label, the channel (the first keel.sh/notify channel, the default channel when there is none) and, for a resource
+// of an approval group, the group. The notice is recorded once the update is applied.
 func (p *Provider) prepareDeployNotice(event *types.Event, plan *UpdatePlan) {
 	if !p.deployNotices || p.approvalManager == nil || plan.Resource == nil {
 		return
@@ -32,6 +32,7 @@ func (p *Provider) prepareDeployNotice(event *types.Event, plan *UpdatePlan) {
 		NewVersion:     plan.NewVersion,
 		CurrentDigest:  plan.CurrentDigest,
 		NewDigest:      plan.NewDigest,
+		Environment:    types.ParseEnvironment(labels, annotations),
 	}
 	p.describeChange(notice, plan, &event.Repository)
 

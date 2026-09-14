@@ -368,6 +368,9 @@ func (m *DefaultManager) requestGroupApproval(r *types.Approval, member types.Ap
 			existing.IncludesMigration = true
 			changed = true
 		}
+		if mergeEnvironment(existing, r.Environment, member.Identifier) {
+			changed = true
+		}
 		if existing.Status() == types.ApprovalStatusPending && r.VotesRequired > existing.VotesRequired {
 			existing.VotesRequired = r.VotesRequired
 			changed = true
@@ -415,6 +418,7 @@ func (m *DefaultManager) requestGroupApproval(r *types.Approval, member types.Ap
 		revived.Archived = false
 		revived.SupersededBy = ""
 		revived.SetMember(member)
+		mergeEnvironment(revived, r.Environment, member.Identifier)
 		if r.VotesRequired > revived.VotesRequired {
 			revived.VotesRequired = r.VotesRequired
 		}

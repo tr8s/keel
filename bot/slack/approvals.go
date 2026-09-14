@@ -114,6 +114,11 @@ func createBlockMessage(title string, botName string, showCommands bool, req *ty
 		rightDetailSection,
 	}
 
+	if req.Environment != "" {
+		environmentField := slack.NewTextBlockObject("mrkdwn", "*Environment:*\n"+escapeMrkdwn(req.Environment), false, false)
+		blocks = append(blocks, slack.NewSectionBlock(nil, []*slack.TextBlockObject{environmentField}, nil))
+	}
+
 	if changeFields := createChangeFields(req); len(changeFields) > 0 {
 		blocks = append(blocks, slack.NewSectionBlock(nil, changeFields, nil))
 	}
