@@ -15,7 +15,7 @@ func mustBlocks(blocks slack.Blocks, _ string) slack.Blocks {
 
 const (
 	migrationWarning  = ":warning: Includes a database migration. Keel does not run migrations; apply it before approving."
-	migrationRollback = "Sets api, portal back to 5f55a51. Database changes are not rolled back. This change included a database migration; rolling back the app does not undo it."
+	migrationRollback = "Roll back api, portal to 5f55a51? Database changes are not rolled back. This change included a database migration; rolling back the app does not undo it."
 )
 
 func TestCompactMigrationWarning(t *testing.T) {
@@ -31,8 +31,8 @@ func TestCompactMigrationWarning(t *testing.T) {
 	live := deployedGroupApproval(types.RolloutStateLive, types.RolloutStateLive)
 	live.IncludesMigration = true
 	rendered = renderBlocks(t, mustBlocks(createCompactBlockMessage(live)))
-	if !strings.Contains(rendered, migrationWarning) || !strings.Contains(rendered, migrationRollback) {
-		t.Errorf("expected the warning to stay and the rollback confirmation to mention the migration, got: %s", rendered)
+	if !strings.Contains(rendered, migrationWarning) {
+		t.Errorf("expected the warning to stay once live, got: %s", rendered)
 	}
 
 	without := renderBlocks(t, mustBlocks(createCompactBlockMessage(groupApproval())))
@@ -44,13 +44,11 @@ func TestCompactMigrationWarning(t *testing.T) {
 func TestRollbackConfirmationMentionsMigration(t *testing.T) {
 	with := deployedGroupApproval(types.RolloutStateLive, types.RolloutStateFailed)
 	with.IncludesMigration = true
-	rendered := renderBlocks(t, mustBlocks(createRolloutFailureMessage(with)))
-	if !strings.Contains(rendered, migrationRollback) {
-		t.Errorf("expected the confirmation to mention the migration, got: %s", rendered)
+	if _, text := createRollbackConfirmation(with); text != migrationRollback {
+		t.Errorf("confirmation = %q, want %q", text, migrationRollback)
 	}
 
-	without := renderBlocks(t, mustBlocks(createRolloutFailureMessage(deployedGroupApproval(types.RolloutStateLive, types.RolloutStateFailed))))
-	if !strings.Contains(without, confirmText+`"`) || strings.Contains(without, "This change included a database migration") {
-		t.Errorf("expected the confirmation without the migration sentence, got: %s", without)
+	if _, text := createRollbackConfirmation(deployedGroupApproval(types.RolloutStateLive, types.RolloutStateFailed)); text != confirmQuestion {
+		t.Errorf("confirmation = %q, want %q", text, confirmQuestion)
 	}
 }

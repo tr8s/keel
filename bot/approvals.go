@@ -221,12 +221,21 @@ func ApprovalsResponse(approvalsManager approvals.Manager) string {
 // processRollbackResponse - request the rollback of the updates of an approval, recording who asked for it. The
 // same rules as approving apply: only responses from the approvals channel reach this point.
 func (bm *BotManager) processRollbackResponse(approvalResponse *ApprovalResponse, reply BotReplyApproval) error {
-	reference := strings.TrimSpace(approvalResponse.Text[len(RollbackResponseKeyword):])
-	if reference == "" {
+	fields := strings.Fields(approvalResponse.Text[len(RollbackResponseKeyword):])
+	if len(fields) == 0 {
 		return fmt.Errorf("rollback needs an approval identifier")
 	}
 
-	approval, err := bm.approvalsManager.RequestRollback(reference, approvalResponse.User)
+	var (
+		approval *types.Approval
+		err      error
+	)
+	if len(fields) > 1 {
+		// confirmed in a bot for the rollout the confirmation showed, refused when the approval changed since
+		approval, err = bm.approvalsManager.RequestConfirmedRollback(fields[0], approvalResponse.User, fields[1])
+	} else {
+		approval, err = bm.approvalsManager.RequestRollback(fields[0], approvalResponse.User)
+	}
 	if err != nil {
 		return err
 	}

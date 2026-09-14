@@ -54,6 +54,11 @@ type Manager interface {
 
 	// RequestRollback requests that the updates approved by an approval are rolled back, recording who asked
 	RequestRollback(reference, actor string) (*types.Approval, error)
+	// RequestConfirmedRollback requests a rollback confirmed for the rollback fingerprint of the approval, refused
+	// when the approval changed since
+	RequestConfirmedRollback(reference, actor, fingerprint string) (*types.Approval, error)
+	// GetByID returns the approval with the id, archived or not
+	GetByID(id string) (*types.Approval, error)
 	// SubscribeRollback - is used by providers to get the rollbacks they apply
 	SubscribeRollback(ctx context.Context) (<-chan *types.Approval, error)
 	// ListRollouts lists the approvals, archived or not, that recorded rollouts

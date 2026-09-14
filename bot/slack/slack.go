@@ -41,6 +41,9 @@ type Bot struct {
 	// records where approval messages were posted, when the bot manager provides it
 	approvalMessages approvalMessageRecorder
 
+	// answers interactions with messages only the user who acted sees, the Slack client when not set
+	interactions interactionResponder
+
 	ctx                context.Context
 	botMessagesChannel chan *bot.BotMessage
 	approvalsRespCh    chan *bot.ApprovalResponse
@@ -207,7 +210,7 @@ func (b *Bot) listenForSocketEvents() error {
 
 					// callback.ResponseURL
 					blockAction := callback.ActionCallback.BlockActions[0]
-					b.handleAction(callback.User.ID, blockAction)
+					b.handleAction(callback.User.ID, blockAction, newInteractionContext(callback))
 					b.slackSocket.Ack(*evt.Request)
 				}
 			}
@@ -282,8 +285,12 @@ func (b *Bot) isEventFromApprovalsChannel(event *slackevents.AppMentionEvent) bo
 // handleAction - Handle an action performed by using the slack block action feature.
 // The bot will only receive events coming from its own action blocks. Block action can only be used to approve
 // or reject an approval request (other commands should be managed by user bot mentions).
-func (b *Bot) handleAction(username string, blockAction *slack.BlockAction) {
+func (b *Bot) handleAction(username string, blockAction *slack.BlockAction, interaction interactionContext) {
 	eventText := actionText(blockAction)
+	if b.handleRollbackAction(username, eventText, interaction) {
+		return
+	}
+
 	approval, ok := bot.IsApproval(username, eventText)
 
 	if !ok {
