@@ -67,14 +67,39 @@ func (p *DefaultProviders) subscribeToApproved() {
 	for {
 		select {
 		case approval := <-approvedCh:
-			approval.Event.TriggerName = types.TriggerTypeApproval.String()
-			p.Submit(*approval.Event)
+			for _, event := range ApprovedEvents(approval) {
+				p.Submit(event)
+			}
 		case <-p.stopCh:
 			cancel()
 			return
 		}
 	}
 
+}
+
+// ApprovedEvents returns the events to submit again once an approval is approved: the event that requested
+// it or, for a group approval, one event per image of the members that were not deployed yet.
+func ApprovedEvents(approval *types.Approval) []types.Event {
+	if len(approval.Members) == 0 {
+		approval.Event.TriggerName = types.TriggerTypeApproval.String()
+		return []types.Event{*approval.Event}
+	}
+
+	var events []types.Event
+	submitted := map[string]bool{}
+	for _, member := range approval.Members {
+		image := member.Repository.String() + "@" + member.Repository.Digest
+		if member.Deployed || submitted[image] {
+			continue
+		}
+		submitted[image] = true
+		events = append(events, types.Event{
+			Repository:  member.Repository,
+			TriggerName: types.TriggerTypeApproval.String(),
+		})
+	}
+	return events
 }
 
 // Submit - submit event to all providers

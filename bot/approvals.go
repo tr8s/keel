@@ -39,6 +39,31 @@ func (bm *BotManager) SubscribeForApprovals(ctx context.Context, approval BotReq
 	}
 }
 
+// SubscribeForApprovalUpdates - refresh approval messages when approvals change without a vote, ie: a workload
+// joins a group approval or a newer change supersedes it
+func (bm *BotManager) SubscribeForApprovalUpdates(ctx context.Context, reply BotReplyApproval) error {
+	updatedCh, err := bm.approvalsManager.SubscribeUpdated(ctx)
+	if err != nil {
+		log.Errorf("bot.subscribeForApprovalUpdates(): %s", err.Error())
+		return err
+	}
+
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case a := <-updatedCh:
+			err = reply(a)
+			if err != nil {
+				log.WithFields(log.Fields{
+					"error":    err,
+					"approval": a.Identifier,
+				}).Error("bot.subscribeForApprovalUpdates: approval update failed")
+			}
+		}
+	}
+}
+
 func (bm *BotManager) ProcessApprovalResponses(ctx context.Context, reply BotReplyApproval) error {
 	for {
 		select {

@@ -78,6 +78,10 @@ const KeelApprovalDeadlineLabel = "keel.sh/approvalDeadline"
 // KeelApprovalDeadlineDefault - default deadline in hours
 const KeelApprovalDeadlineDefault = 24
 
+// KeelApprovalGroupAnnotation - optional approval group: workloads of a
+// namespace in the same group that update to the same change share one approval
+const KeelApprovalGroupAnnotation = "keel.sh/approvalGroup"
+
 // KeelReleasePage - optional release notes URL passed on with notification
 const KeelReleaseNotesURL = "keel.sh/releaseNotes"
 

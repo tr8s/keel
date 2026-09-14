@@ -107,6 +107,9 @@ type UpdatePlan struct {
 	// New digest taken from the event repository, empty when the trigger
 	// did not provide one
 	NewDigest string
+
+	// identifier of the group approval that approved this plan, empty otherwise
+	groupApproval string
 }
 
 func (p *UpdatePlan) String() string {

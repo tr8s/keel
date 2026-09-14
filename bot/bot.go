@@ -143,6 +143,7 @@ func (bm *BotManager) SetupBot(botName string, bot Bot) {
 		go bm.ProcessBotMessages(ctx, bot.Respond)
 		go bm.ProcessApprovalResponses(ctx, bot.ReplyToApproval)
 		go bm.SubscribeForApprovals(ctx, bot.RequestApproval)
+		go bm.SubscribeForApprovalUpdates(ctx, bot.ReplyToApproval)
 	}
 }
 
