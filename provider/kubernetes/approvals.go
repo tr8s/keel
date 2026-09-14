@@ -86,6 +86,7 @@ func (p *Provider) isApproved(event *types.Event, plan *UpdatePlan) (bool, error
 	}
 
 	if minApprovals == 0 {
+		p.prepareDeployNotice(event, plan)
 		return true, nil
 	}
 

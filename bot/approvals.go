@@ -40,6 +40,10 @@ func (bm *BotManager) SubscribeForRolloutFailures(ctx context.Context, notify Bo
 		case <-ctx.Done():
 			return nil
 		case a := <-failedCh:
+			// deploy notices report their failures themselves
+			if a.IsNotice() {
+				continue
+			}
 			err = notify(a)
 			if err != nil {
 				log.WithFields(log.Fields{
@@ -63,6 +67,9 @@ func (bm *BotManager) SubscribeForApprovals(ctx context.Context, approval BotReq
 		case <-ctx.Done():
 			return nil
 		case a := <-approvalsCh:
+			if a.IsNotice() {
+				continue
+			}
 			err = approval(a)
 			if err != nil {
 				log.WithFields(log.Fields{
@@ -88,6 +95,10 @@ func (bm *BotManager) SubscribeForApprovalUpdates(ctx context.Context, reply Bot
 		case <-ctx.Done():
 			return nil
 		case a := <-updatedCh:
+			// deploy notices are posted and updated by the deploy notice poster
+			if a.IsNotice() {
+				continue
+			}
 			err = reply(a)
 			if err != nil {
 				log.WithFields(log.Fields{

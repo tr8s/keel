@@ -55,6 +55,12 @@ type Bot interface {
 	ReplyToApproval(approval *types.Approval) error
 }
 
+// DeployNoticer - a bot that reports the updates that need no approval with deploy notices. Deploy notices start
+// whether or not the bot itself is configured and started.
+type DeployNoticer interface {
+	StartDeployNotices(ctx context.Context, config config.Config, approvalsManager approvals.Manager) bool
+}
+
 type teardown func()
 type BotMessageResponder func(response string, channel string)
 
@@ -123,6 +129,10 @@ func Run(appConfig config.Config, k8sImplementer kubernetes.Implementer, approva
 		botMessagesChannel: make(chan *BotMessage),
 	}
 	for botName, bot := range bots {
+		// deploy notices do not need the bot connection, ie: a Slack app token
+		if noticer, ok := bot.(DeployNoticer); ok && noticer.StartDeployNotices(context.Background(), appConfig, approvalsManager) {
+			log.Infof("bot.Run(): bot [%s] posts deploy notices", botName)
+		}
 		configured := bot.Configure(appConfig, bm.approvalsRespCh, bm.botMessagesChannel)
 		if configured {
 			bm.SetupBot(botName, bot)

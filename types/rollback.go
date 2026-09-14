@@ -32,6 +32,8 @@ var ErrAlreadyRolledBack = errors.New("the approved update was already rolled ba
 // RollbackError - why the updates of the approval can not be rolled back, nil when they can
 func (a *Approval) RollbackError() error {
 	switch {
+	case a.IsNotice():
+		return errors.New("updates without approval can not be rolled back")
 	case a.RolledBackBy != "":
 		return ErrAlreadyRolledBack
 	case a.RollbackFailure != "":

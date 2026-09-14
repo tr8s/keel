@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,7 +16,7 @@ var loadMutex sync.Mutex
 var environmentVariables = []string{
 	"DEBUG", "PUBSUB", "POLL", "POLL_SCAN_INTERVAL", "PROJECT_ID", "CLUSTER_NAME", "XDG_DATA_HOME", "HELM3_PROVIDER", "UI_DIR",
 	"NOTIFICATION_LEVEL", "WEBHOOK_ENDPOINT", "SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "SLACK_BOT_NAME", "SLACK_CHANNELS", "SLACK_APPROVALS_CHANNEL",
-	"SLACK_APPROVAL_HIDE_COMMANDS", "SLACK_APPROVAL_COMPACT", "SLACK_APPROVAL_MIGRATION_NOTE", "HIPCHAT_SERVER", "HIPCHAT_TOKEN", "HIPCHAT_BOT_NAME", "HIPCHAT_CHANNELS", "HIPCHAT_APPROVALS_CHANNEL", "HIPCHAT_APPROVALS_USER_NAME",
+	"SLACK_APPROVAL_HIDE_COMMANDS", "SLACK_APPROVAL_COMPACT", "SLACK_APPROVAL_MIGRATION_NOTE", "SLACK_DEPLOY_NOTICES", "SLACK_DEPLOY_NOTICES_MENTION", "HIPCHAT_SERVER", "HIPCHAT_TOKEN", "HIPCHAT_BOT_NAME", "HIPCHAT_CHANNELS", "HIPCHAT_APPROVALS_CHANNEL", "HIPCHAT_APPROVALS_USER_NAME",
 	"HIPCHAT_APPROVALS_BOT_NAME", "HIPCHAT_APPROVALS_PASSWORT", "HIPCHAT_CONNECTION_ATTEMPTS", "MATTERMOST_ENDPOINT", "MATTERMOST_USERNAME",
 	"TEAMS_WEBHOOK_URL", "DISCORD_WEBHOOK_URL", "SHOUTRRR_URLS", "SHOUTRRR_TIMEOUT", "MAIL_TO", "MAIL_FROM", "MAIL_SMTP_SERVER",
 	"MAIL_SMTP_PORT", "MAIL_SMTP_USER", "MAIL_SMTP_PASS", "BASIC_AUTH_USER", "BASIC_AUTH_PASSWORD", "AUTHENTICATED_WEBHOOKS",
@@ -156,6 +157,19 @@ type SlackBotConfig struct {
 	// migration in the compact layout, ie: that the migration runs when the
 	// new pods start. Empty keeps the default note.
 	ApprovalMigrationNote string `envconfig:"SLACK_APPROVAL_MIGRATION_NOTE"`
+	// DeployNotices posts a deploy notice to Slack for every update that
+	// needs no approval and updates it while the update rolls out. It only
+	// needs the bot token, not the app token.
+	DeployNotices bool `envconfig:"SLACK_DEPLOY_NOTICES" default:"false"`
+	// DeployNoticesMention is put in front of the thread reply about a failed
+	// rollout of a deploy notice, ie: <!here>. Empty mentions nobody.
+	DeployNoticesMention string `envconfig:"SLACK_DEPLOY_NOTICES_MENTION"`
+}
+
+// DeployNoticesEnabled reports whether deploy notices are on and can be
+// posted, which needs a bot token
+func (c SlackBotConfig) DeployNoticesEnabled() bool {
+	return c.DeployNotices && strings.HasPrefix(c.BotToken, "xoxb-")
 }
 
 // HipchatBotConfig configures the HipChat approvals bot, credentials, and connection behavior.

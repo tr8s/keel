@@ -51,6 +51,11 @@ func (s *sender) Configure(config *notification.Config) (bool, error) {
 }
 
 func (s *sender) Send(event types.EventNotification) error {
+	// the Slack deploy notice of the update already reports it
+	if event.Metadata[types.DeployNoticeMetadataKey] == "true" {
+		return nil
+	}
+
 	params := slack.NewPostMessageParameters()
 	params.Username = s.botName
 	params.IconURL = constants.KeelLogoURL

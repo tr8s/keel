@@ -63,6 +63,9 @@ type Manager interface {
 	SubscribeRollback(ctx context.Context) (<-chan *types.Approval, error)
 	// ListRollouts lists the approvals, archived or not, that recorded rollouts
 	ListRollouts() ([]*types.Approval, error)
+	// RecordDeployNotice records the deploy notice of an update that needed no approval, joining the notice of the
+	// same change of the resource or approval group
+	RecordDeployNotice(r *types.Approval, member types.ApprovalMember) (*types.Approval, error)
 
 	// Increases Approval votes by 1
 	Approve(identifier, voter string) (*types.Approval, error)
@@ -177,6 +180,17 @@ func (m *DefaultManager) expireEntries() error {
 	}
 
 	for _, approval := range approvals {
+		if approval.IsNotice() {
+			// deploy notices are kept for a while and leave no audit entry
+			if approval.Expired() {
+				if err := m.store.DeleteApproval(approval); err != nil {
+					log.WithFields(log.Fields{
+						"error": err,
+					}).Error("approvals.expireEntries: failed to delete expired deploy notice")
+				}
+			}
+			continue
+		}
 		if approval.Expired() {
 			err = m.Delete(approval)
 			if err != nil {
@@ -606,12 +620,21 @@ func (m *DefaultManager) Get(identifier string) (*types.Approval, error) {
 	return a, nil
 }
 
-// List - list not archived approvals (for expiration service)
+// List - list not archived approvals (for expiration service). Deploy notices are no approvals and are left out.
 func (m *DefaultManager) List() ([]*types.Approval, error) {
 	approvals, err := m.store.ListApprovals(&types.GetApprovalQuery{
 		Archived: false,
 	})
-	return approvals, err
+	if err != nil {
+		return approvals, err
+	}
+	listed := make([]*types.Approval, 0, len(approvals))
+	for _, approval := range approvals {
+		if !approval.IsNotice() {
+			listed = append(listed, approval)
+		}
+	}
+	return listed, nil
 }
 
 // Delete - delete specified approval

@@ -116,6 +116,8 @@ type UpdatePlan struct {
 	containers []types.RolloutContainer
 	// digest of a container that was pinned by digest before the update, ie: by a rollback
 	pinnedDigest string
+	// the deploy notice recorded once the update is applied, nil when the update needs no notice
+	notice *types.Approval
 }
 
 func (p *UpdatePlan) String() string {
@@ -174,6 +176,8 @@ type Provider struct {
 	// resume the rollouts and rollbacks in progress before a restart, after the delay
 	resumeEnabled bool
 	resumeDelay   time.Duration
+	// record deploy notices for the updates that need no approval and follow their rollouts
+	deployNotices bool
 
 	events chan *types.Event
 	stop   chan struct{}
@@ -646,7 +650,8 @@ func (p *Provider) applyPlan(plan *UpdatePlan) *k8s.GenericResource {
 		}).Warn("provider.kubernetes: got error while archiving approvals counter after successful update")
 	}
 
-	// approved updates report their rollout on the approval
+	// approved updates report their rollout on the approval, updates without approval on their deploy notice
+	noticed := plan.approvalID == "" && plan.notice != nil && p.recordDeployNotice(plan)
 	if plan.approvalID != "" {
 		p.startRollout(plan)
 	}
@@ -659,6 +664,11 @@ func (p *Provider) applyPlan(plan *UpdatePlan) *k8s.GenericResource {
 		msg = fmt.Sprintf("Successfully updated %s %s/%s %s->%s (%s)", resource.Kind(), resource.Namespace, resource.Name, currentVersion, newVersion, strings.Join(images, ", "))
 	}
 
+	metadata := updateMetadata(resource, plan, p.GetName())
+	if noticed {
+		// the deploy notice reports the update, so the Slack notification sender leaves it out
+		metadata[types.DeployNoticeMetadataKey] = "true"
+	}
 	if err := p.sender.Send(types.EventNotification{
 		ResourceKind: resource.Kind(),
 		Identifier:   resource.Identifier,
@@ -668,7 +678,7 @@ func (p *Provider) applyPlan(plan *UpdatePlan) *k8s.GenericResource {
 		Type:         types.NotificationDeploymentUpdate,
 		Level:        types.LevelSuccess,
 		Channels:     notificationChannels,
-		Metadata:     updateMetadata(resource, plan, p.GetName()),
+		Metadata:     metadata,
 	}); err != nil {
 		log.WithFields(log.Fields{
 			"error":     err,

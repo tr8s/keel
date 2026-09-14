@@ -66,6 +66,10 @@ func (b *Bot) Configure(appConfig config.Config, approvalsRespCh chan *bot.Appro
 		log.Warn("bot.slack.Configure(): SLACK_BOT_TOKEN must have the prefix \"xoxb-\", skipping bot configuration.")
 		return false
 	}
+	if cfg.AppToken == "" && cfg.DeployNotices {
+		log.Info("bot.slack.Configure(): SLACK_APP_TOKEN is not set, the approvals bot is not started; deploy notices only need SLACK_BOT_TOKEN")
+		return false
+	}
 	if !strings.HasPrefix(cfg.AppToken, "xapp-") {
 		log.Warn("bot.slack.Configure(): SLACK_APP_TOKEN must have the prefix \"xapp-\", skipping bot configuration.")
 		return false
