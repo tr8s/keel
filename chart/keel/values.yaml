@@ -376,6 +376,11 @@ dockerRegistry:
   name: ""
   key: ""
 
+# -- Persist approvals, rollouts and the audit log (SQLite under /data) on a
+# ReadWriteOnce volume; set deploymentStrategy.type to Recreate with it. The Keel image
+# runs as uid and gid 666 while a new volume is usually owned by root, so the chart sets
+# podSecurityContext.fsGroup to 666 unless fsGroup is set. Without a writable volume Keel
+# logs "unable to open database file" and never becomes ready.
 persistence:
   enabled: false
   storageClass: "-"

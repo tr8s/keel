@@ -129,6 +129,14 @@ func main() {
 		log.WithError(err).Fatal("invalid administrator authentication configuration")
 	}
 
+	// SQLite only reports "unable to open database file" when the data directory is not writable, ie: a new
+	// volume owned by root while Keel runs as uid 666. Startup continues as before.
+	if err := sql.CheckDataDir(cfg.Storage.DataDir); err != nil {
+		log.WithFields(log.Fields{
+			"error": err,
+		}).Errorf("data directory %s is not writable by uid %d: set podSecurityContext.fsGroup to the group of the Keel user (666 in the Keel image)", cfg.Storage.DataDir, os.Getuid())
+	}
+
 	sqlStore, err := sql.New(sql.Opts{
 		DatabaseType: "sqlite3",
 		URI:          filepath.Join(cfg.Storage.DataDir, "keel.db"),
