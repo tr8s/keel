@@ -7,7 +7,7 @@ COPY go.mod go.sum ./
 RUN go mod download
 COPY . .
 RUN CGO_ENABLED=1 go build -a -tags netgo \
-    -ldflags "-w -s -linkmode external -extldflags '-static' -X github.com/keel-hq/keel/version.Version=0.22.3-tr8s.3" \
+    -ldflags "-w -s -linkmode external -extldflags '-static' -X github.com/keel-hq/keel/version.Version=0.22.3-tr8s.4" \
     -o /go/bin/keel ./cmd/keel
 
 FROM ghcr.io/keel-hq/keel:0.22.3
