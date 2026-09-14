@@ -70,6 +70,15 @@ type Approval struct {
 	Members      ApprovalMembers `json:"members,omitempty" gorm:"type:json"`
 	SupersededBy string          `json:"supersededBy,omitempty"`
 
+	// Rollout follows the rollout of every resource updated from the approval
+	Rollout RolloutTargets `json:"rollout,omitempty" gorm:"type:json"`
+
+	// MessageChannel and MessageTimestamp identify the message a bot posted
+	// for the approval, so that it can update the message and reply in its
+	// thread. Empty when the bot does not record them.
+	MessageChannel   string `json:"messageChannel,omitempty"`
+	MessageTimestamp string `json:"messageTimestamp,omitempty"`
+
 	// Digest is used to verify that images are the ones that got the approvals.
 	// If digest doesn't match for the image, votes are reset.
 	Digest string `json:"digest"`

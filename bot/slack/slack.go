@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/keel-hq/keel/bot"
 	"github.com/keel-hq/keel/pkg/config"
+	"github.com/keel-hq/keel/types"
 	"github.com/slack-go/slack"
 	"github.com/slack-go/slack/slackevents"
 	"github.com/slack-go/slack/socketmode"
@@ -36,6 +37,9 @@ type Bot struct {
 
 	// show approval messages in the compact layout
 	compactApprovals bool
+
+	// records where approval messages were posted, when the bot manager provides it
+	approvalMessages approvalMessageRecorder
 
 	ctx                context.Context
 	botMessagesChannel chan *bot.BotMessage
@@ -297,17 +301,16 @@ func (b *Bot) handleAction(username string, blockAction *slack.BlockAction) {
 
 // postApprovalMessageBlock - effectively post a message to the approval channel. The text, when not empty,
 // is the notification text of the message.
-func (b *Bot) postApprovalMessageBlock(approvalId string, blocks slack.Blocks, text string) error {
+// It returns the channel and the timestamp that identify the posted message.
+func (b *Bot) postApprovalMessageBlock(approvalId string, blocks slack.Blocks, text string) (string, string, error) {
 	channelID := b.approvalsChannel
-	_, _, err := b.slackSocket.PostMessage(
+	return b.slackSocket.PostMessage(
 		channelID,
 		approvalMessageOptions(text,
 			slack.MsgOptionBlocks(blocks.BlockSet...),
 			createApprovalMetadata(approvalId),
 		)...,
 	)
-
-	return err
 }
 
 // approvalMessageOptions - add the notification text to the message options when there is one
@@ -345,7 +348,23 @@ func (b *Bot) Respond(text string, channel string) {
 // upsertApprovalMessage - update the approval message that was sent for the given resource identifier (deployment/default/wd:0.0.15).
 // if the message is not found in the approval channel it will be created. That way even it the message is deleted,
 // we will see the approval status
-func (b *Bot) upsertApprovalMessage(approvalId string, blocks slack.Blocks, text string) {
+func (b *Bot) upsertApprovalMessage(approval *types.Approval, blocks slack.Blocks, text string) {
+	approvalId := approval.ID
+	updateOptions := approvalMessageOptions(text,
+		slack.MsgOptionBlocks(blocks.BlockSet...),
+		slack.MsgOptionAsUser(true),
+		createApprovalMetadata(approvalId),
+	)
+
+	// the message recorded when it was posted is updated directly
+	if approval.MessageChannel != "" && approval.MessageTimestamp != "" {
+		_, _, _, err := b.slackSocket.UpdateMessage(approval.MessageChannel, approval.MessageTimestamp, updateOptions...)
+		if err == nil {
+			return
+		}
+		log.Debugf("Unable to update the recorded approval message, looking for it: %v", err)
+	}
+
 	// Retrieve the message history
 	historyParams := &slack.GetConversationHistoryParameters{
 		ChannelID:          b.approvalChannelId,
@@ -356,7 +375,8 @@ func (b *Bot) upsertApprovalMessage(approvalId string, blocks slack.Blocks, text
 	history, err := b.slackSocket.GetConversationHistory(historyParams)
 	if err != nil {
 		log.Debugf("Unable to get the conversation history to edit the message, post new one: %v", err)
-		b.postApprovalMessageBlock(approvalId, blocks, text)
+		b.postAndRecordApprovalMessage(approvalId, blocks, text)
+		return
 	}
 
 	// Find the message to update; the channel id and the message timestamp is the identifier of a message for slack
@@ -370,19 +390,25 @@ func (b *Bot) upsertApprovalMessage(approvalId string, blocks slack.Blocks, text
 
 	if messageTs == "" {
 		log.Debug("Unable to find the approval message for the identifier. Post a new message instead")
-		b.postApprovalMessageBlock(approvalId, blocks, text)
+		b.postAndRecordApprovalMessage(approvalId, blocks, text)
 		return
 	} else {
 		b.slackSocket.UpdateMessage(
 			b.approvalChannelId,
 			messageTs,
-			approvalMessageOptions(text,
-				slack.MsgOptionBlocks(blocks.BlockSet...),
-				slack.MsgOptionAsUser(true),
-				createApprovalMetadata(approvalId),
-			)...,
+			updateOptions...,
 		)
+		b.recordApprovalMessage(approvalId, b.approvalChannelId, messageTs)
 	}
+}
+
+func (b *Bot) postAndRecordApprovalMessage(approvalId string, blocks slack.Blocks, text string) {
+	channel, timestamp, err := b.postApprovalMessageBlock(approvalId, blocks, text)
+	if err != nil {
+		log.Debugf("Unable to post the approval message: %v", err)
+		return
+	}
+	b.recordApprovalMessage(approvalId, channel, timestamp)
 }
 
 // isMessageOfApprovalRequest - Check whether the given message is the approval message sent for the given approval identifier.

@@ -79,6 +79,10 @@ func createCompactBlockMessage(req *types.Approval) (slack.Blocks, string) {
 	case req.Rejected:
 		blocks = append(blocks, compactContext(":x: Rejected"))
 	case req.VotesReceived >= req.VotesRequired:
+		if status := rolloutStatus(req, name); status != "" {
+			blocks = append(blocks, compactContext(status))
+			break
+		}
 		outcome := ":white_check_mark: Approved"
 		if voters := req.GetVoters(); len(voters) > 0 {
 			outcome += " by " + formatVoters(voters)
@@ -111,11 +115,7 @@ func compactContext(text string) *slack.ContextBlock {
 func memberNames(req *types.Approval, group string) []string {
 	names := make([]string, 0, len(req.Members))
 	for _, member := range req.Members {
-		name := member.Name
-		if short := strings.TrimPrefix(name, group+"-"); short != "" {
-			name = short
-		}
-		names = append(names, name)
+		names = append(names, shortMemberName(member.Name, group))
 	}
 	return names
 }

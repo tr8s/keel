@@ -44,6 +44,14 @@ type Manager interface {
 	// SetGroupMemberDeployed records that a member of a group approval was updated
 	SetGroupMemberDeployed(identifier, memberIdentifier string) error
 
+	// UpdateRollout applies fn to the approval with the id, archived or not, to record the rollout of the
+	// updates it approved
+	UpdateRollout(id string, fn func(approval *types.Approval) bool) (*types.Approval, error)
+	// SubscribeRolloutFailed - is used to get approvals whose approved update failed to roll out
+	SubscribeRolloutFailed(ctx context.Context) (<-chan *types.Approval, error)
+	// SetApprovalMessage records where a bot posted the message of an approval
+	SetApprovalMessage(id, channel, timestamp string) error
+
 	// Increases Approval votes by 1
 	Approve(identifier, voter string) (*types.Approval, error)
 	// Rejects Approval
@@ -88,6 +96,9 @@ type DefaultManager struct {
 	// updated channels
 	updatedCh map[uint32]chan *types.Approval
 
+	// rollout failure channels
+	rolloutFailedCh map[uint32]chan *types.Approval
+
 	mu    *sync.Mutex
 	subMu *sync.RWMutex
 }
@@ -101,13 +112,14 @@ type Opts struct {
 func New(opts *Opts) *DefaultManager {
 	man := &DefaultManager{
 		// cache:      opts.Cache,
-		store:      opts.Store,
-		channels:   make(map[uint32]chan *types.Approval),
-		approvedCh: make(map[uint32]chan *types.Approval),
-		updatedCh:  make(map[uint32]chan *types.Approval),
-		index:      0,
-		mu:         &sync.Mutex{},
-		subMu:      &sync.RWMutex{},
+		store:           opts.Store,
+		channels:        make(map[uint32]chan *types.Approval),
+		approvedCh:      make(map[uint32]chan *types.Approval),
+		updatedCh:       make(map[uint32]chan *types.Approval),
+		rolloutFailedCh: make(map[uint32]chan *types.Approval),
+		index:           0,
+		mu:              &sync.Mutex{},
+		subMu:           &sync.RWMutex{},
 	}
 
 	return man

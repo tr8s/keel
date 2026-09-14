@@ -88,6 +88,7 @@ func (p *Provider) isGroupApproved(event *types.Event, plan *UpdatePlan, group s
 	}
 
 	plan.groupApproval = approval.Identifier
+	plan.approvalID = approval.ID
 	return true, nil
 }
 
