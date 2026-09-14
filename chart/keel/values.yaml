@@ -381,6 +381,13 @@ persistence:
   storageClass: "-"
   size: 1Gi
 
+# -- Strategy of the Keel Deployment, ie: {type: Recreate}. Unset keeps the Kubernetes
+# default (RollingUpdate). Use Recreate when persistence is enabled: the volume is
+# ReadWriteOnce, so a rolling update starts the new pod while the old one still holds
+# the volume and the new pod never starts. With Recreate the chart also clears the
+# rollingUpdate settings an existing Deployment has.
+deploymentStrategy: {}
+
 # -- Pod security context (runAsUser, etc.)
 podSecurityContext: {}
 

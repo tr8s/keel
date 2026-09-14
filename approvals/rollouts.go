@@ -65,6 +65,26 @@ func (m *DefaultManager) SetApprovalMessage(id, channel, timestamp string) error
 	return m.store.UpdateApproval(approval)
 }
 
+// ListRollouts - list the approvals, archived or not, that recorded rollouts, ie: to resume them after a restart
+func (m *DefaultManager) ListRollouts() ([]*types.Approval, error) {
+	seen := make(map[string]bool)
+	var rollouts []*types.Approval
+	for _, archived := range []bool{false, true} {
+		approvals, err := m.store.ListApprovals(&types.GetApprovalQuery{Archived: archived})
+		if err != nil {
+			return nil, err
+		}
+		for _, approval := range approvals {
+			if seen[approval.ID] || len(approval.Rollout) == 0 {
+				continue
+			}
+			seen[approval.ID] = true
+			rollouts = append(rollouts, approval)
+		}
+	}
+	return rollouts, nil
+}
+
 // getByID - get the approval with the id, archived or not
 func (m *DefaultManager) getByID(id string) (*types.Approval, error) {
 	if id == "" {

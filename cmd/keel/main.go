@@ -339,6 +339,8 @@ func setupProviders(opts *ProviderOpts) (providers provider.Providers) {
 	k8sProvider.SetRolloutTimeout(opts.appConfig.Kubernetes.RolloutTimeout)
 	// roll approved updates back when approvers ask for it
 	k8sProvider.EnableRollbacks()
+	// pick up rollouts and rollbacks that were in progress when Keel stopped
+	k8sProvider.ResumeRollouts(kubernetes.DefaultResumeDelay)
 	go func() {
 		err := k8sProvider.Start()
 		if err != nil {

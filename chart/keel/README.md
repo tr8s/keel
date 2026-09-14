@@ -164,6 +164,7 @@ The following table lists has the main configurable parameters (polling, trigger
 | `persistence.enabled`                       | Enable/disable audit log persistence   | `false`                                                    |
 | `persistence.storageClass`                  | Storage Class for the Persistent Volume| `-`                                                       |
 | `persistence.size`                          | Persistent Volume size                 | `1Gi`                                                     |
+| `deploymentStrategy`                        | Keel Deployment strategy, set `type: Recreate` with persistence | `{}`                                     |
 | `imagePullSecrets`                          | Image pull secrets                     | `[]`                                                      |
 
 Specify each parameter using the `--set key=value[,key=value]` argument to `helm install`.
