@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/keel-hq/keel/types"
+
+	log "github.com/sirupsen/logrus"
 )
 
 // getApprovalGroupFromMeta returns the approval group of a resource (keel.sh/approvalGroup), empty when it
@@ -66,6 +68,14 @@ func (p *Provider) isGroupApproved(event *types.Event, plan *UpdatePlan, group s
 		}
 
 		p.describeChange(req, plan, &event.Repository)
+
+		if isHeldRevision(resource, &event.Repository, req.NewRevision) {
+			log.WithFields(log.Fields{
+				"resource": resource.Identifier,
+				"revision": req.NewRevision,
+			}).Info("provider.kubernetes: revision was rolled back on this resource, not offering it again")
+			return false, nil
+		}
 
 		change := req.NewRevision
 		if change == "" {

@@ -106,7 +106,7 @@ func checkForUpdate(plc policy.Policy, repo *types.Repository, resource *k8s.Gen
 			if !containerFilterFunc(c) {
 				continue
 			}
-			containerImageRef, err := image.Parse(c.Image)
+			containerImageRef, err := image.Parse(trackedContainerImage(resource, c))
 			if err != nil {
 				log.WithFields(log.Fields{
 					"error":      err,
@@ -171,7 +171,7 @@ func checkForUpdate(plc policy.Policy, repo *types.Repository, resource *k8s.Gen
 		if !containerFilterFunc(c) {
 			continue
 		}
-		containerImageRef, err := image.Parse(c.Image)
+		containerImageRef, err := image.Parse(trackedContainerImage(resource, c))
 		if err != nil {
 			log.WithFields(log.Fields{
 				"error":      err,

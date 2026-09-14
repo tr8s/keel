@@ -79,8 +79,8 @@ func createCompactBlockMessage(req *types.Approval) (slack.Blocks, string) {
 	case req.Rejected:
 		blocks = append(blocks, compactContext(":x: Rejected"))
 	case req.VotesReceived >= req.VotesRequired:
-		if status := rolloutStatus(req, name); status != "" {
-			blocks = append(blocks, compactContext(status))
+		if rollout := rolloutBlocks(req, name); len(rollout) > 0 {
+			blocks = append(blocks, rollout...)
 			break
 		}
 		outcome := ":white_check_mark: Approved"

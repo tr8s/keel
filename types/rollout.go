@@ -27,6 +27,8 @@ type RolloutTarget struct {
 	Name string `json:"name"`
 	// Marker is the keel.sh/update-time value of the update, it tells the updated pod template apart
 	Marker string `json:"marker,omitempty"`
+	// Containers are the containers the update changed
+	Containers []RolloutContainer `json:"containers,omitempty"`
 
 	State RolloutState `json:"state"`
 	// Ready and Desired count the replicas of the update

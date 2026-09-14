@@ -66,6 +66,12 @@ func (p *Provider) startRollout(plan *UpdatePlan) {
 		State:      types.RolloutStateRolling,
 		StartedAt:  time.Now(),
 	}
+	// what rolling the resource back needs
+	for _, container := range plan.containers {
+		container.PreviousDigest = plan.CurrentDigest
+		container.NewDigest = plan.NewDigest
+		target.Containers = append(target.Containers, container)
+	}
 
 	_, err := p.approvalManager.UpdateRollout(plan.approvalID, func(approval *types.Approval) bool {
 		approval.SetRolloutTarget(target)

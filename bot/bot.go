@@ -27,6 +27,7 @@ var (
 			`- "rm approval <approval identifier>" -> remove approval`,
 			`- "approve <approval identifier>" -> approve update request`,
 			`- "reject <approval identifier>" -> reject update request`,
+			`- "rollback <approval identifier>" -> roll back an approved update`,
 			// `- "get deployments all" -> get a list of all deployments`,
 			// `- "describe deployment <deployment>" -> get details for specified deployment`,
 		},
@@ -43,6 +44,7 @@ var (
 
 	ApprovalResponseKeyword = "approve"
 	RejectResponseKeyword   = "reject"
+	RollbackResponseKeyword = "rollback"
 )
 
 type Bot interface {
@@ -76,6 +78,8 @@ type ApprovalResponse struct {
 	User   string
 	Status types.ApprovalStatus
 	Text   string
+	// Rollback is set when the response asks to roll the approved updates back
+	Rollback bool
 }
 
 // BotManager holds approvalsManager and k8sImplementer for every bot

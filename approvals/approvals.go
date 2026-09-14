@@ -52,6 +52,11 @@ type Manager interface {
 	// SetApprovalMessage records where a bot posted the message of an approval
 	SetApprovalMessage(id, channel, timestamp string) error
 
+	// RequestRollback requests that the updates approved by an approval are rolled back, recording who asked
+	RequestRollback(reference, actor string) (*types.Approval, error)
+	// SubscribeRollback - is used by providers to get the rollbacks they apply
+	SubscribeRollback(ctx context.Context) (<-chan *types.Approval, error)
+
 	// Increases Approval votes by 1
 	Approve(identifier, voter string) (*types.Approval, error)
 	// Rejects Approval
@@ -99,6 +104,9 @@ type DefaultManager struct {
 	// rollout failure channels
 	rolloutFailedCh map[uint32]chan *types.Approval
 
+	// rollback request channels
+	rollbackCh map[uint32]chan *types.Approval
+
 	mu    *sync.Mutex
 	subMu *sync.RWMutex
 }
@@ -117,6 +125,7 @@ func New(opts *Opts) *DefaultManager {
 		approvedCh:      make(map[uint32]chan *types.Approval),
 		updatedCh:       make(map[uint32]chan *types.Approval),
 		rolloutFailedCh: make(map[uint32]chan *types.Approval),
+		rollbackCh:      make(map[uint32]chan *types.Approval),
 		index:           0,
 		mu:              &sync.Mutex{},
 		subMu:           &sync.RWMutex{},
