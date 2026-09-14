@@ -43,7 +43,10 @@ unknown, once the update was rolled back, or on a superseded approval.
 When the new image of any workload carries the label `sh.keel.change.migrations=true`, the approval message warns
 that the change includes a database migration, which Keel does not run and which has to be applied before
 approving. The rollback confirmation then also says that rolling back the app does not undo the migration. Without
-the label, or with `false`, there is no warning.
+the label, or with `false`, there is no warning. When the application runs its migrations itself, for example when
+the server starts, set `SLACK_APPROVAL_MIGRATION_NOTE` (chart value `slack.approvalMigrationNote`) to what approvers
+should know instead, ie: `It runs when the new pods start.` The warning then reads `Includes a database migration.`
+followed by the note (at most 300 characters); the rollback confirmation keeps its own migration sentence.
 
 ## Commit list
 

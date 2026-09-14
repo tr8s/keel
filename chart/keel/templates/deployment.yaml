@@ -182,6 +182,10 @@ spec:
             - name: SLACK_APPROVAL_COMPACT
               value: "true"
   {{- end }}
+  {{- if .Values.slack.approvalMigrationNote }}
+            - name: SLACK_APPROVAL_MIGRATION_NOTE
+              value: {{ .Values.slack.approvalMigrationNote | quote }}
+  {{- end }}
 {{- end }}
 {{- if .Values.hipchat.enabled }}
             # Enable hipchat approvials and notification

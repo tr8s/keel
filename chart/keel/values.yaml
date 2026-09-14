@@ -103,6 +103,9 @@ slack:
   hideApprovalCommands: false
   # show approval messages in a compact layout focused on the commit being deployed (no command list)
   compactApprovals: false
+  # what approvers do about a database migration in the change, shown after "Includes a database migration."
+  # ie: "It runs when the new pods start." Empty keeps "Keel does not run migrations; apply it before approving."
+  approvalMigrationNote: ""
 
 # Hipchat notification and approvals
 hipchat:

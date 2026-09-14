@@ -102,6 +102,7 @@ The following table lists has the main configurable parameters (polling, trigger
 | `slack.approvalsChannel`                    | Slack channel for approvals            |                                                           |
 | `slack.hideApprovalCommands`                | Hide bot commands in approval messages | `false`                                                   |
 | `slack.compactApprovals`                    | Compact approval messages              | `false`                                                   |
+| `slack.approvalMigrationNote`               | What approvers do about a database migration, shown in compact approval messages | `""` (Keel does not run migrations; apply it before approving.) |
 | `teams.enabled`                             | Enable/disable MS Teams Notification   | `false`                                                   |
 | `teams.webhookUrl`                          | MS Teams Connector's webhook url       |                                                           |
 | `service.enabled`                           | Enable/disable Keel service            | `false`                                                   |
