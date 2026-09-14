@@ -36,6 +36,21 @@ that the change includes a database migration, which Keel does not run and which
 approving. The rollback confirmation then also says that rolling back the app does not undo the migration. Without
 the label, or with `false`, there is no warning.
 
+## Commit list
+
+When a change has more than one commit, the approval message lists up to five of them, newest first, instead of the
+single commit subject, followed by `and N more` when there are more. The list comes from these image labels:
+
+- `sh.keel.change.base`: the revision the tag pointed at before the build, where the list starts (may be empty)
+- `sh.keel.change.count`: the number of commits from the base to the revision of the image
+- `sh.keel.change.commits`: standard base64 of a JSON array of `{"sha": "...", "subject": "..."}`, newest first, at
+  most five items
+
+A list that can not be decoded is ignored and the message shows the single subject. The link to the changes still
+compares the revision running in the cluster with the new one, because that is what the update changes. When the
+base differs from the running revision, for example because an earlier build was never deployed, the base only
+explains where the list starts.
+
 A rollback sets every resource updated from the approval back to the image it ran before, pinned by digest
 (`registry/repository@sha256:...`). Pinning matters with a moving tag and `imagePullPolicy: Always`: restarting pods
 on the tag would pull the rolled back image again. **Database changes, such as migrations, are not rolled back.**

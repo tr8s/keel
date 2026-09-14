@@ -64,6 +64,14 @@ type Approval struct {
 	// label sh.keel.change.migrations=true
 	IncludesMigration bool `json:"includesMigration,omitempty"`
 
+	// ChangeBase, ChangeCount and ChangeCommits describe the commits of the
+	// change from the sh.keel.change.* labels of the new image: the revision
+	// the list starts from, the number of commits, and the newest of them
+	// (at most MaxChangeCommits). Empty when unknown.
+	ChangeBase    string        `json:"changeBase,omitempty"`
+	ChangeCount   int           `json:"changeCount,omitempty"`
+	ChangeCommits ChangeCommits `json:"changeCommits,omitempty" gorm:"type:json"`
+
 	// Group, Members and SupersededBy are set on the approval shared by the
 	// workloads of an approval group (keel.sh/approvalGroup) that update to
 	// the same change. Group is "<namespace>/<group>", Members are the
