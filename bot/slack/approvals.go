@@ -15,7 +15,7 @@ import (
 func (b *Bot) RequestApproval(req *types.Approval) error {
 	return b.postApprovalMessageBlock(
 		req.ID,
-		createBlockMessage("Approval required! :mega:", b.name, req),
+		createBlockMessage("Approval required! :mega:", b.name, !b.hideApprovalCommands, req),
 	)
 }
 
@@ -30,11 +30,11 @@ func (b *Bot) ReplyToApproval(approval *types.Approval) error {
 		title = "Change approved! :tada:"
 	}
 
-	b.upsertApprovalMessage(approval.ID, createBlockMessage(title, b.name, approval))
+	b.upsertApprovalMessage(approval.ID, createBlockMessage(title, b.name, !b.hideApprovalCommands, approval))
 	return nil
 }
 
-func createBlockMessage(title string, botName string, req *types.Approval) slack.Blocks {
+func createBlockMessage(title string, botName string, showCommands bool, req *types.Approval) slack.Blocks {
 	if req.Expired() {
 		title = title + " (Expired)"
 	}
@@ -90,28 +90,15 @@ func createBlockMessage(title string, botName string, req *types.Approval) slack
 	)
 	rightDetailSection := slack.NewSectionBlock(nil, []*slack.TextBlockObject{identifierField, providerField}, nil)
 
-	commands := bot.BotEventTextToResponse["help"]
-	var commandTexts []slack.MixedElement
-
-	for i, cmd := range commands {
-		// -- avoid adding first line in commands which is the title.
-		if i == 0 {
-			continue
-		}
-		cmd = addBotMentionToCommand(cmd, botName)
-		commandTexts = append(commandTexts, slack.NewTextBlockObject("mrkdwn", cmd, false, false))
-	}
-	commandsBlock := slack.NewContextBlock("", commandTexts...)
-	header := commands[0]
-
 	blocks := []slack.Block{
 		headerSection,
 		messageBlock,
 		leftDetailSection,
 		rightDetailSection,
-		slack.NewDividerBlock(),
-		slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", header, false, false)),
-		commandsBlock,
+	}
+
+	if showCommands {
+		blocks = append(blocks, createCommandBlocks(botName)...)
 	}
 
 	if req.VotesReceived < req.VotesRequired && !req.Expired() && !req.Rejected {
@@ -149,6 +136,29 @@ func createBlockMessage(title string, botName string, req *types.Approval) slack
 	}
 	return slack.Blocks{
 		BlockSet: blocks,
+	}
+}
+
+// createCommandBlocks - list the supported bot commands, as returned by the help command
+func createCommandBlocks(botName string) []slack.Block {
+	commands := bot.BotEventTextToResponse["help"]
+	var commandTexts []slack.MixedElement
+
+	for i, cmd := range commands {
+		// -- avoid adding first line in commands which is the title.
+		if i == 0 {
+			continue
+		}
+		cmd = addBotMentionToCommand(cmd, botName)
+		commandTexts = append(commandTexts, slack.NewTextBlockObject("mrkdwn", cmd, false, false))
+	}
+	commandsBlock := slack.NewContextBlock("", commandTexts...)
+	header := commands[0]
+
+	return []slack.Block{
+		slack.NewDividerBlock(),
+		slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", header, false, false)),
+		commandsBlock,
 	}
 }
 

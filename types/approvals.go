@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -38,6 +39,12 @@ type Approval struct {
 
 	CurrentVersion string `json:"currentVersion"`
 	NewVersion     string `json:"newVersion"`
+
+	// CurrentDigest and NewDigest identify the images behind CurrentVersion
+	// and NewVersion when known, so that updates keeping the same tag
+	// (ie: main -> main) can be told apart.
+	CurrentDigest string `json:"currentDigest,omitempty"`
+	NewDigest     string `json:"newDigest,omitempty"`
 
 	// Digest is used to verify that images are the ones that got the approvals.
 	// If digest doesn't match for the image, votes are reset.
@@ -129,8 +136,27 @@ func (a *Approval) Expired() bool {
 
 // Delta of what's changed
 // ie: webhookrelay/webhook-demo:0.15.0 -> webhookrelay/webhook-demo:0.16.0
+// When the tag stays the same, the known image digests tell the images apart
+// ie: main@sha256:5f55a51b -> main@sha256:62c200e9
 func (a *Approval) Delta() string {
-	return fmt.Sprintf("%s -> %s", a.CurrentVersion, a.NewVersion)
+	current, next := a.CurrentVersion, a.NewVersion
+	if current == next {
+		current = versionWithDigest(current, a.CurrentDigest)
+		next = versionWithDigest(next, a.NewDigest)
+	}
+	return fmt.Sprintf("%s -> %s", current, next)
+}
+
+// versionWithDigest appends an abbreviated digest to a version when the
+// digest is known, ie: main@sha256:62c200e9
+func versionWithDigest(version, digest string) string {
+	if digest == "" {
+		return version
+	}
+	if algorithm, hex, ok := strings.Cut(digest, ":"); ok && len(hex) > 8 {
+		digest = algorithm + ":" + hex[:8]
+	}
+	return version + "@" + digest
 }
 
 // JSONB is stored as a JSON blob

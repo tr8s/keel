@@ -31,6 +31,9 @@ type Bot struct {
 	// the identifier of the approval channel, this is retrieved when the bot is starting
 	approvalChannelId string
 
+	// leave the list of bot commands out of approval messages
+	hideApprovalCommands bool
+
 	ctx                context.Context
 	botMessagesChannel chan *bot.BotMessage
 	approvalsRespCh    chan *bot.ApprovalResponse
@@ -56,6 +59,7 @@ func (b *Bot) Configure(appConfig config.Config, approvalsRespCh chan *bot.Appro
 	}
 	b.name = cfg.BotName
 	b.approvalsChannel = strings.TrimPrefix(cfg.ApprovalsChannel, "#")
+	b.hideApprovalCommands = cfg.HideApprovalCommands
 	api := slack.New(cfg.BotToken, slack.OptionDebug(appConfig.Debug), slack.OptionAppLevelToken(cfg.AppToken))
 	b.slackSocket = socketmode.New(api, socketmode.OptionDebug(appConfig.Debug))
 	b.approvalsRespCh = approvalsRespCh
