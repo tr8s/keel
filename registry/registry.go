@@ -1,6 +1,7 @@
 package registry
 
 import (
+	"context"
 	"errors"
 	"hash/fnv"
 	"os"
@@ -175,6 +176,30 @@ INIT_CLIENT:
 	}
 
 	return digests, nil
+}
+
+// ImageLabels returns the manifest annotations and image config labels of the
+// image identified by opts.Tag, which may be a tag or a digest.
+func (c *DefaultClient) ImageLabels(ctx context.Context, opts Opts) (map[string]string, error) {
+	if opts.Tag == "" {
+		return nil, ErrTagNotSupplied
+	}
+
+INIT_CLIENT:
+	hub, err := c.getRegistryClient(opts.Registry, opts.Username, opts.Password)
+	if err != nil {
+		return nil, err
+	}
+
+	labels, err := hub.ImageLabels(ctx, opts.Name, opts.Tag)
+	if err != nil {
+		if strings.Contains(err.Error(), "server gave HTTP response to HTTPS client") && strings.HasPrefix(opts.Registry, "https://") && c.insecure {
+			opts.Registry = strings.Replace(opts.Registry, "https://", "http://", 1)
+			goto INIT_CLIENT
+		}
+		return nil, err
+	}
+	return labels, nil
 }
 
 // Platforms returns the platforms supported by a tagged image manifest.

@@ -8,6 +8,7 @@ import (
 	"unicode"
 
 	"github.com/keel-hq/keel/types"
+	"github.com/keel-hq/keel/util/scm"
 	"github.com/slack-go/slack"
 )
 
@@ -97,6 +98,10 @@ func createBlockMessage(title string, botName string, showCommands bool, req *ty
 		rightDetailSection,
 	}
 
+	if changeFields := createChangeFields(req); len(changeFields) > 0 {
+		blocks = append(blocks, slack.NewSectionBlock(nil, changeFields, nil))
+	}
+
 	if showCommands {
 		blocks = append(blocks, createCommandBlocks(botName)...)
 	}
@@ -160,6 +165,54 @@ func createCommandBlocks(botName string) []slack.Block {
 		slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", header, false, false)),
 		commandsBlock,
 	}
+}
+
+// createChangeFields - describe the code change behind the new image when its revision is known: a link to
+// the commit and, when the running revision is known too, a link to the changes in between. Revisions hosted
+// on services that are not recognized are shown as text.
+func createChangeFields(req *types.Approval) []*slack.TextBlockObject {
+	if req.NewRevision == "" {
+		return nil
+	}
+
+	links := scm.ChangeLinks(req.SourceURL, req.CurrentRevision, req.NewRevision)
+
+	commit := "`" + escapeMrkdwn(req.NewRevision) + "`"
+	if links.Commit != "" {
+		commit = fmt.Sprintf("<%s|%s>", links.Commit, escapeMrkdwn(shortRevision(req.NewRevision)))
+	}
+	fields := []*slack.TextBlockObject{
+		slack.NewTextBlockObject("mrkdwn", "*Commit:*\n"+commit, false, false),
+	}
+
+	if links.Compare != "" {
+		changes := fmt.Sprintf("<%s|%s...%s>",
+			links.Compare,
+			escapeMrkdwn(shortRevision(req.CurrentRevision)),
+			escapeMrkdwn(shortRevision(req.NewRevision)),
+		)
+		fields = append(fields, slack.NewTextBlockObject("mrkdwn", "*Changes:*\n"+changes, false, false))
+	}
+
+	return fields
+}
+
+// shortRevision - abbreviate a full git commit hash to 7 characters, other revisions are kept as they are
+func shortRevision(revision string) string {
+	if len(revision) != 40 && len(revision) != 64 {
+		return revision
+	}
+	for _, r := range revision {
+		if !strings.ContainsRune("0123456789abcdefABCDEF", r) {
+			return revision
+		}
+	}
+	return revision[:7]
+}
+
+// escapeMrkdwn - escape the characters that Slack uses for its control sequences
+func escapeMrkdwn(text string) string {
+	return strings.NewReplacer("&", "&amp;", "<", "&lt;", ">", "&gt;").Replace(text)
 }
 
 func addBotMentionToCommand(command string, botName string) string {

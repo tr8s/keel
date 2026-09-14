@@ -46,6 +46,14 @@ type Approval struct {
 	CurrentDigest string `json:"currentDigest,omitempty"`
 	NewDigest     string `json:"newDigest,omitempty"`
 
+	// SourceURL, CurrentRevision and NewRevision describe the code change
+	// behind the update when the images carry the
+	// org.opencontainers.image.source and org.opencontainers.image.revision
+	// labels. Empty when unknown.
+	SourceURL       string `json:"sourceUrl,omitempty"`
+	CurrentRevision string `json:"currentRevision,omitempty"`
+	NewRevision     string `json:"newRevision,omitempty"`
+
 	// Digest is used to verify that images are the ones that got the approvals.
 	// If digest doesn't match for the image, votes are reset.
 	Digest string `json:"digest"`

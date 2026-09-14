@@ -81,6 +81,14 @@ const KeelApprovalDeadlineDefault = 24
 // KeelReleasePage - optional release notes URL passed on with notification
 const KeelReleaseNotesURL = "keel.sh/releaseNotes"
 
+// OCIImageSourceLabel - image label (or manifest annotation) holding the URL
+// of the source repository the image was built from
+const OCIImageSourceLabel = "org.opencontainers.image.source"
+
+// OCIImageRevisionLabel - image label (or manifest annotation) holding the
+// source control revision the image was built from
+const OCIImageRevisionLabel = "org.opencontainers.image.revision"
+
 func init() {
 	value, found := os.LookupEnv("POLL_DEFAULTSCHEDULE")
 	if found {
