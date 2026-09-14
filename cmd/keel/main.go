@@ -347,6 +347,10 @@ func setupProviders(opts *ProviderOpts) (providers provider.Providers) {
 	k8sProvider.SetRolloutTimeout(opts.appConfig.Kubernetes.RolloutTimeout)
 	// roll approved updates back when approvers ask for it
 	k8sProvider.EnableRollbacks()
+	// report updates that need no approval with Slack deploy notices
+	if opts.appConfig.Bots.Slack.DeployNoticesEnabled() {
+		k8sProvider.EnableDeployNotices()
+	}
 	// pick up rollouts and rollbacks that were in progress when Keel stopped
 	k8sProvider.ResumeRollouts(kubernetes.DefaultResumeDelay)
 	go func() {

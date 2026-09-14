@@ -20,7 +20,7 @@ The Slack approval message (compact layout, `SLACK_APPROVAL_COMPACT=true`) is up
 progresses, and once it is live or failed. When a rollout fails, Keel also replies in the thread of the approval
 message, mentioning the approvers.
 
-Resources without approvals are not followed.
+Resources without approvals are not followed, unless deploy notices are on (see [deploy-notices.md](deploy-notices.md)).
 
 ## Roll back
 

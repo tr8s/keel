@@ -103,6 +103,8 @@ The following table lists has the main configurable parameters (polling, trigger
 | `slack.hideApprovalCommands`                | Hide bot commands in approval messages | `false`                                                   |
 | `slack.compactApprovals`                    | Compact approval messages              | `false`                                                   |
 | `slack.approvalMigrationNote`               | What approvers do about a database migration, shown in compact approval messages | `""` (Keel does not run migrations; apply it before approving.) |
+| `slack.deployNotices`                       | Post a deploy notice for every update without approval and follow its rollout; needs only `slack.botToken` (scope `chat:write`), see docs/deploy-notices.md | `false` |
+| `slack.deployNoticesMention`                | Mention in the thread reply about a failed rollout of a deploy notice, ie: `<!here>` | `""` (nobody) |
 | `teams.enabled`                             | Enable/disable MS Teams Notification   | `false`                                                   |
 | `teams.webhookUrl`                          | MS Teams Connector's webhook url       |                                                           |
 | `service.enabled`                           | Enable/disable Keel service            | `false`                                                   |

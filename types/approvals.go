@@ -82,6 +82,10 @@ type Approval struct {
 	Members      ApprovalMembers `json:"members,omitempty" gorm:"type:json"`
 	SupersededBy string          `json:"supersededBy,omitempty"`
 
+	// Kind tells deploy notices (ApprovalKindNotice) apart from approvals,
+	// which leave it empty
+	Kind string `json:"kind,omitempty"`
+
 	// Rollout follows the rollout of every resource updated from the approval
 	Rollout RolloutTargets `json:"rollout,omitempty" gorm:"type:json"`
 
