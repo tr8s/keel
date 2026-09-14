@@ -37,6 +37,11 @@ func (p *Provider) checkForApprovals(event *types.Event, plans []*UpdatePlan) (a
 
 // updateComplete is called after we successfully update resource
 func (p *Provider) updateComplete(plan *UpdatePlan) error {
+	if plan.groupApproval != "" {
+		// group approvals stay active for the members that arrive later
+		return p.approvalManager.SetGroupMemberDeployed(plan.groupApproval, plan.Resource.Identifier)
+	}
+
 	approvalIdentifier := getApprovalIdentifier(plan.Resource.Identifier, plan.NewVersion)
 	// There might be no approvals for this plan
 	if p.approvalManager.Exists(approvalIdentifier) {
@@ -94,6 +99,10 @@ func (p *Provider) isApproved(event *types.Event, plan *UpdatePlan) (bool, error
 		}).Warn("failed to parse approvals deadline, using default value")
 	} else if d != 0 {
 		deadline = d
+	}
+
+	if group := getApprovalGroupFromMeta(plan.Resource.GetLabels(), plan.Resource.GetAnnotations()); group != "" {
+		return p.isGroupApproved(event, plan, group, minApprovals, deadline)
 	}
 
 	identifier := getApprovalIdentifier(plan.Resource.Identifier, plan.NewVersion)

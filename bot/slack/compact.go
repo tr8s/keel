@@ -24,6 +24,7 @@ var slackUserID = regexp.MustCompile(`^[UW][A-Z0-9]{6,}$`)
 // buttons, decided or expired ones their outcome. It also returns the notification text of the message.
 func createCompactBlockMessage(req *types.Approval) (slack.Blocks, string) {
 	namespace, name := approvalWorkload(req)
+	members := memberNames(req, name)
 	reference := shortChangeReference(req)
 	links := scm.ChangeLinks(req.SourceURL, req.CurrentRevision, req.NewRevision)
 
@@ -52,6 +53,9 @@ func createCompactBlockMessage(req *types.Approval) (slack.Blocks, string) {
 	if namespace != "" {
 		details = append(details, escapeMrkdwn(namespace))
 	}
+	if len(members) > 0 {
+		details = append(details, escapeMrkdwn(strings.Join(members, ", ")))
+	}
 	if req.CommitAuthor != "" {
 		details = append(details, escapeMrkdwn(req.CommitAuthor))
 	}
@@ -70,6 +74,8 @@ func createCompactBlockMessage(req *types.Approval) (slack.Blocks, string) {
 	}
 
 	switch {
+	case req.SupersededBy != "":
+		blocks = append(blocks, compactContext(":fast_forward: Superseded by "+escapeMrkdwn(shortChange(req.SupersededBy))))
 	case req.Rejected:
 		blocks = append(blocks, compactContext(":x: Rejected"))
 	case req.VotesReceived >= req.VotesRequired:
@@ -84,7 +90,11 @@ func createCompactBlockMessage(req *types.Approval) (slack.Blocks, string) {
 		blocks = append(blocks, createApprovalButtons(req.Identifier))
 	}
 
-	text := fmt.Sprintf("Deploy %s %s", name, reference)
+	text := "Deploy " + name
+	if len(members) > 0 {
+		text += " (" + strings.Join(members, ", ") + ")"
+	}
+	text += " " + reference
 	if subject != "" {
 		text += ": " + subject
 	}
@@ -96,9 +106,35 @@ func compactContext(text string) *slack.ContextBlock {
 	return slack.NewContextBlock("", slack.NewTextBlockObject("mrkdwn", text, false, false))
 }
 
-// approvalWorkload - namespace and name of the workload an approval is for, taken from its identifier
+// memberNames - names of the members of a group approval, without the group name prefix
+// ie: trackeid-api in group trackeid -> api
+func memberNames(req *types.Approval, group string) []string {
+	names := make([]string, 0, len(req.Members))
+	for _, member := range req.Members {
+		name := member.Name
+		if short := strings.TrimPrefix(name, group+"-"); short != "" {
+			name = short
+		}
+		names = append(names, name)
+	}
+	return names
+}
+
+// shortChange - abbreviate a revision or a digest, other references are kept as they are
+func shortChange(change string) string {
+	if strings.Contains(change, ":") {
+		return types.ShortDigest(change)
+	}
+	return shortRevision(change)
+}
+
+// approvalWorkload - namespace and name of the workload an approval is for: the approval group of a group
+// approval, otherwise the resource in its identifier
 // ie: deployment/trackeid/trackeid-portal:main -> trackeid, trackeid-portal
 func approvalWorkload(req *types.Approval) (namespace, name string) {
+	if groupNamespace, group, ok := strings.Cut(req.Group, "/"); ok {
+		return groupNamespace, group
+	}
 	parts := strings.Split(strings.TrimSuffix(req.Identifier, ":"+req.NewVersion), "/")
 	name = parts[len(parts)-1]
 	if len(parts) > 1 {

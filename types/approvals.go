@@ -60,6 +60,16 @@ type Approval struct {
 	CommitSubject string `json:"commitSubject,omitempty"`
 	CommitAuthor  string `json:"commitAuthor,omitempty"`
 
+	// Group, Members and SupersededBy are set on the approval shared by the
+	// workloads of an approval group (keel.sh/approvalGroup) that update to
+	// the same change. Group is "<namespace>/<group>", Members are the
+	// workloads the approval decides for, and SupersededBy is the revision
+	// (or else digest or version) of the newer change that replaced the
+	// approval while it was pending.
+	Group        string          `json:"group,omitempty"`
+	Members      ApprovalMembers `json:"members,omitempty" gorm:"type:json"`
+	SupersededBy string          `json:"supersededBy,omitempty"`
+
 	// Digest is used to verify that images are the ones that got the approvals.
 	// If digest doesn't match for the image, votes are reset.
 	Digest string `json:"digest"`

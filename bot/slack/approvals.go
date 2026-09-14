@@ -28,6 +28,9 @@ func (b *Bot) ReplyToApproval(approval *types.Approval) error {
 	case types.ApprovalStatusApproved:
 		title = "Change approved! :tada:"
 	}
+	if approval.SupersededBy != "" {
+		title = "Change superseded! :fast_forward:"
+	}
 
 	blocks, text := b.createApprovalMessage(title, approval)
 	b.upsertApprovalMessage(approval.ID, blocks, text)
@@ -110,11 +113,20 @@ func createBlockMessage(title string, botName string, showCommands bool, req *ty
 		blocks = append(blocks, slack.NewSectionBlock(nil, changeFields, nil))
 	}
 
+	if len(req.Members) > 0 {
+		names := make([]string, 0, len(req.Members))
+		for _, member := range req.Members {
+			names = append(names, member.Name)
+		}
+		membersField := slack.NewTextBlockObject("mrkdwn", "*Members:*\n"+escapeMrkdwn(strings.Join(names, ", ")), false, false)
+		blocks = append(blocks, slack.NewSectionBlock(nil, []*slack.TextBlockObject{membersField}, nil))
+	}
+
 	if showCommands {
 		blocks = append(blocks, createCommandBlocks(botName)...)
 	}
 
-	if req.VotesReceived < req.VotesRequired && !req.Expired() && !req.Rejected {
+	if req.VotesReceived < req.VotesRequired && !req.Expired() && !req.Rejected && req.SupersededBy == "" {
 		blocks = append(
 			blocks,
 			slack.NewDividerBlock(),

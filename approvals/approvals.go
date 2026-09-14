@@ -27,12 +27,22 @@ type Manager interface {
 	// SubscribeApproved - is used to get approved events by the manager
 	SubscribeApproved(ctx context.Context) (<-chan *types.Approval, error)
 
+	// SubscribeUpdated - is used to get approvals that changed without a vote, ie: a workload joined a
+	// group approval or a newer change superseded it
+	SubscribeUpdated(ctx context.Context) (<-chan *types.Approval, error)
+
 	// request approval for deployment/release/etc..
 	Create(r *types.Approval) error
 	// Update whole approval object
 	Update(r *types.Approval) error
 	// SetRequiredVotes updates pending approvals for a resource and reevaluates their status.
 	SetRequiredVotes(resourceIdentifier string, provider types.ProviderType, votesRequired int) error
+
+	// RequestGroupApproval requests approval for a workload of an approval group, sharing one approval
+	// between the workloads of the group that update to the same change
+	RequestGroupApproval(r *types.Approval, member types.ApprovalMember) (*types.Approval, error)
+	// SetGroupMemberDeployed records that a member of a group approval was updated
+	SetGroupMemberDeployed(identifier, memberIdentifier string) error
 
 	// Increases Approval votes by 1
 	Approve(identifier, voter string) (*types.Approval, error)
@@ -75,6 +85,9 @@ type DefaultManager struct {
 	// approved channels
 	approvedCh map[uint32]chan *types.Approval
 
+	// updated channels
+	updatedCh map[uint32]chan *types.Approval
+
 	mu    *sync.Mutex
 	subMu *sync.RWMutex
 }
@@ -91,6 +104,7 @@ func New(opts *Opts) *DefaultManager {
 		store:      opts.Store,
 		channels:   make(map[uint32]chan *types.Approval),
 		approvedCh: make(map[uint32]chan *types.Approval),
+		updatedCh:  make(map[uint32]chan *types.Approval),
 		index:      0,
 		mu:         &sync.Mutex{},
 		subMu:      &sync.RWMutex{},
@@ -154,69 +168,53 @@ func (m *DefaultManager) expireEntries() error {
 
 // Subscribe - subscribe for approval events
 func (m *DefaultManager) Subscribe(ctx context.Context) (<-chan *types.Approval, error) {
-	m.subMu.Lock()
-	index := atomic.AddUint32(&m.index, 1)
-	approvalsCh := make(chan *types.Approval, 10)
-	m.channels[index] = approvalsCh
-	m.subMu.Unlock()
-
-	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				m.subMu.Lock()
-
-				delete(m.channels, index)
-
-				m.subMu.Unlock()
-				return
-			}
-		}
-	}()
-
-	return approvalsCh, nil
+	return m.subscribe(ctx, m.channels), nil
 }
 
 // SubscribeApproved - subscribe for approved update requests
 func (m *DefaultManager) SubscribeApproved(ctx context.Context) (<-chan *types.Approval, error) {
+	return m.subscribe(ctx, m.approvedCh), nil
+}
+
+// SubscribeUpdated - subscribe for approvals that changed without a vote
+func (m *DefaultManager) SubscribeUpdated(ctx context.Context) (<-chan *types.Approval, error) {
+	return m.subscribe(ctx, m.updatedCh), nil
+}
+
+func (m *DefaultManager) subscribe(ctx context.Context, channels map[uint32]chan *types.Approval) <-chan *types.Approval {
 	m.subMu.Lock()
 	index := atomic.AddUint32(&m.index, 1)
-	approvedCh := make(chan *types.Approval, 10)
-	m.approvedCh[index] = approvedCh
+	ch := make(chan *types.Approval, 10)
+	channels[index] = ch
 	m.subMu.Unlock()
 
 	go func() {
-		for {
-			select {
-			case <-ctx.Done():
-				m.subMu.Lock()
-
-				delete(m.approvedCh, index)
-
-				m.subMu.Unlock()
-				return
-			}
-		}
+		<-ctx.Done()
+		m.subMu.Lock()
+		delete(channels, index)
+		m.subMu.Unlock()
 	}()
 
-	return approvedCh, nil
+	return ch
 }
 
 func (m *DefaultManager) publishRequest(approval *types.Approval) error {
-	m.subMu.RLock()
-	defer m.subMu.RUnlock()
-
-	for _, subscriber := range m.channels {
-		subscriber <- approval
-	}
-	return nil
+	return m.publish(m.channels, approval)
 }
 
 func (m *DefaultManager) publishApproved(approval *types.Approval) error {
+	return m.publish(m.approvedCh, approval)
+}
+
+func (m *DefaultManager) publishUpdated(approval *types.Approval) error {
+	return m.publish(m.updatedCh, approval)
+}
+
+func (m *DefaultManager) publish(channels map[uint32]chan *types.Approval, approval *types.Approval) error {
 	m.subMu.RLock()
 	defer m.subMu.RUnlock()
 
-	for _, subscriber := range m.approvedCh {
+	for _, subscriber := range channels {
 		subscriber <- approval
 	}
 	return nil
@@ -283,6 +281,183 @@ func (m *DefaultManager) SetRequiredVotes(resourceIdentifier string, provider ty
 	}
 
 	return nil
+}
+
+// RequestGroupApproval - request approval for a workload of an approval group. The workloads of a group that
+// update to the same change share the approval identified by r.Identifier:
+//   - when that approval is active, member joins it, or refreshes its entry when it waits for another image.
+//     While the approval is pending its required votes are raised to r.VotesRequired when that is higher;
+//     decided approvals keep their votes, so members that arrive late follow the decision.
+//   - otherwise r is created with member as its only member, and the other active approvals of the group are
+//     archived. Pending ones are marked as superseded by the new change.
+//
+// A pending approval past its deadline is replaced. A change keyed on a tag rather than a revision is new
+// when the member was already deployed or waits for another image. Subscribers are notified of the created
+// approval (Subscribe) and of changed approvals (SubscribeUpdated).
+func (m *DefaultManager) RequestGroupApproval(r *types.Approval, member types.ApprovalMember) (*types.Approval, error) {
+	m.mu.Lock()
+	approval, created, updated, err := m.requestGroupApproval(r, member)
+	m.mu.Unlock()
+	if err != nil {
+		return nil, err
+	}
+
+	// subscribers are notified once the lock is released, processing their queue may need it
+	for _, u := range updated {
+		m.publishUpdated(u)
+	}
+	if created {
+		m.publishRequest(approval)
+	}
+
+	return approval, nil
+}
+
+func (m *DefaultManager) requestGroupApproval(r *types.Approval, member types.ApprovalMember) (approval *types.Approval, created bool, updated []*types.Approval, err error) {
+	existing, err := m.Get(r.Identifier)
+	if err != nil && err != store.ErrRecordNotFound {
+		return nil, false, nil, err
+	}
+
+	if err == nil && !isStaleGroupApproval(r, existing, member) {
+		changed := existing.SetMember(member)
+		if existing.Status() == types.ApprovalStatusPending && r.VotesRequired > existing.VotesRequired {
+			existing.VotesRequired = r.VotesRequired
+			changed = true
+		}
+		if changed {
+			existing.UpdatedAt = time.Now()
+			if err := m.store.UpdateApproval(existing); err != nil {
+				return nil, false, nil, err
+			}
+			updated = append(updated, existing)
+		}
+		return existing, false, updated, nil
+	}
+
+	// the members of a group can arrive interleaved across two changes, so a change that was superseded while
+	// pending comes back with the members that already joined it
+	var revived *types.Approval
+	if existing == nil {
+		if revived, err = m.supersededGroupApproval(r.Identifier); err != nil {
+			return nil, false, nil, err
+		}
+	}
+
+	active, err := m.List()
+	if err != nil {
+		return nil, false, nil, err
+	}
+	for _, other := range active {
+		// the approvals list also holds archived approvals, which are settled already
+		if other.Group != r.Group || other.Archived {
+			continue
+		}
+		if other.Status() == types.ApprovalStatusPending && !other.Expired() {
+			other.SupersededBy = groupChange(r)
+			updated = append(updated, other)
+		}
+		other.Archived = true
+		if err := m.store.UpdateApproval(other); err != nil {
+			return nil, false, nil, err
+		}
+		m.addAuditEntry(other, types.AuditActionApprovalArchived, "")
+	}
+
+	if revived != nil {
+		revived.Archived = false
+		revived.SupersededBy = ""
+		revived.SetMember(member)
+		if r.VotesRequired > revived.VotesRequired {
+			revived.VotesRequired = r.VotesRequired
+		}
+		revived.UpdatedAt = time.Now()
+		if err := m.store.UpdateApproval(revived); err != nil {
+			return nil, false, nil, err
+		}
+		return revived, false, append(updated, revived), nil
+	}
+
+	r.Members = types.ApprovalMembers{member}
+	r.CreatedAt = time.Now()
+	r.UpdatedAt = time.Now()
+
+	approval, err = m.store.CreateApproval(r)
+	if err != nil {
+		return nil, false, nil, fmt.Errorf("failed to create approval: %s", err)
+	}
+
+	return approval, true, updated, nil
+}
+
+// isStaleGroupApproval - whether the active group approval with the requested identifier can not be joined: it
+// is pending past its deadline, or it is keyed on a tag and the member already moved on to another image
+func isStaleGroupApproval(r, existing *types.Approval, member types.ApprovalMember) bool {
+	if existing.Status() == types.ApprovalStatusPending && existing.Expired() {
+		return true
+	}
+	if r.NewRevision != "" {
+		return false
+	}
+	current := existing.Member(member.Identifier)
+	if current == nil {
+		return false
+	}
+	if current.Deployed {
+		return true
+	}
+	return current.Repository.Digest != "" && member.Repository.Digest != "" && current.Repository.Digest != member.Repository.Digest
+}
+
+// groupChange - the change a group approval is for: its revision, or else its digest or version
+func groupChange(r *types.Approval) string {
+	switch {
+	case r.NewRevision != "":
+		return r.NewRevision
+	case r.NewDigest != "":
+		return r.NewDigest
+	default:
+		return r.NewVersion
+	}
+}
+
+// supersededGroupApproval - the archived approval with the identifier that a newer change superseded while it
+// was pending, nil when there is none or when it is past its deadline
+func (m *DefaultManager) supersededGroupApproval(identifier string) (*types.Approval, error) {
+	archived, err := m.store.ListApprovals(&types.GetApprovalQuery{
+		Identifier: identifier,
+		Archived:   true,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	for _, approval := range archived {
+		if approval.Archived && approval.SupersededBy != "" && approval.Status() == types.ApprovalStatusPending && !approval.Expired() {
+			return approval, nil
+		}
+	}
+	return nil, nil
+}
+
+// SetGroupMemberDeployed - record that a member of a group approval was updated, so that repeated events for
+// the same image do not update it again
+func (m *DefaultManager) SetGroupMemberDeployed(identifier, memberIdentifier string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	existing, err := m.Get(identifier)
+	if err != nil {
+		return err
+	}
+
+	member := existing.Member(memberIdentifier)
+	if member == nil || member.Deployed {
+		return nil
+	}
+	member.Deployed = true
+
+	return m.store.UpdateApproval(existing)
 }
 
 // Approve - increase VotesReceived by 1 and returns updated version
