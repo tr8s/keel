@@ -33,5 +33,5 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           tags: |
-            ghcr.io/${{ github.repository }}:0.22.3-tr8s.2
+            ghcr.io/${{ github.repository }}:0.22.3-tr8s.3
             ghcr.io/${{ github.repository }}:tr8s-${{ github.sha }}
