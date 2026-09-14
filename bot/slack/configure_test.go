@@ -13,11 +13,11 @@ func TestConfigureUsesTypedConfiguration(t *testing.T) {
 	responses := make(chan *bot.ApprovalResponse)
 	messages := make(chan *bot.BotMessage)
 	b := &Bot{}
-	cfg := config.Config{Bots: config.BotConfig{Slack: config.SlackBotConfig{BotToken: "xoxb-typed", AppToken: "xapp-typed", BotName: "typed-name", ApprovalsChannel: "#typed-channel"}}}
+	cfg := config.Config{Bots: config.BotConfig{Slack: config.SlackBotConfig{BotToken: "xoxb-typed", AppToken: "xapp-typed", BotName: "typed-name", ApprovalsChannel: "#typed-channel", HideApprovalCommands: true}}}
 	if !b.Configure(cfg, responses, messages) {
 		t.Fatal("Configure() disabled a valid typed configuration")
 	}
-	if b.name != "typed-name" || b.approvalsChannel != "typed-channel" {
+	if b.name != "typed-name" || b.approvalsChannel != "typed-channel" || !b.hideApprovalCommands {
 		t.Fatalf("typed fields not mapped: %#v", b)
 	}
 	if b.slackSocket == nil || b.approvalsRespCh != responses || b.botMessagesChannel != messages {

@@ -162,6 +162,10 @@ spec:
             - name: SLACK_BOT_NAME
               value: "{{ .Values.slack.botName }}"
   {{- end }}
+  {{- if .Values.slack.hideApprovalCommands }}
+            - name: SLACK_APPROVAL_HIDE_COMMANDS
+              value: "true"
+  {{- end }}
 {{- end }}
 {{- if .Values.hipchat.enabled }}
             # Enable hipchat approvials and notification

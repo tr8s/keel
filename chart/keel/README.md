@@ -100,6 +100,7 @@ The following table lists has the main configurable parameters (polling, trigger
 | `slack.appToken`                            | Slack application level token          |                                                           |
 | `slack.channel`                             | Slack channel                          |                                                           |
 | `slack.approvalsChannel`                    | Slack channel for approvals            |                                                           |
+| `slack.hideApprovalCommands`                | Hide bot commands in approval messages | `false`                                                   |
 | `teams.enabled`                             | Enable/disable MS Teams Notification   | `false`                                                   |
 | `teams.webhookUrl`                          | MS Teams Connector's webhook url       |                                                           |
 | `service.enabled`                           | Enable/disable Keel service            | `false`                                                   |

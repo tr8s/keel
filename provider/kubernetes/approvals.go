@@ -117,6 +117,8 @@ func (p *Provider) isApproved(event *types.Event, plan *UpdatePlan) (bool, error
 				Event:          event,
 				CurrentVersion: plan.CurrentVersion,
 				NewVersion:     plan.NewVersion,
+				CurrentDigest:  plan.CurrentDigest,
+				NewDigest:      plan.NewDigest,
 				VotesRequired:  minApprovals,
 				VotesReceived:  0,
 				Rejected:       false,

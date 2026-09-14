@@ -15,7 +15,7 @@ var loadMutex sync.Mutex
 var environmentVariables = []string{
 	"DEBUG", "PUBSUB", "POLL", "POLL_SCAN_INTERVAL", "PROJECT_ID", "CLUSTER_NAME", "XDG_DATA_HOME", "HELM3_PROVIDER", "UI_DIR",
 	"NOTIFICATION_LEVEL", "WEBHOOK_ENDPOINT", "SLACK_BOT_TOKEN", "SLACK_APP_TOKEN", "SLACK_BOT_NAME", "SLACK_CHANNELS", "SLACK_APPROVALS_CHANNEL",
-	"HIPCHAT_SERVER", "HIPCHAT_TOKEN", "HIPCHAT_BOT_NAME", "HIPCHAT_CHANNELS", "HIPCHAT_APPROVALS_CHANNEL", "HIPCHAT_APPROVALS_USER_NAME",
+	"SLACK_APPROVAL_HIDE_COMMANDS", "HIPCHAT_SERVER", "HIPCHAT_TOKEN", "HIPCHAT_BOT_NAME", "HIPCHAT_CHANNELS", "HIPCHAT_APPROVALS_CHANNEL", "HIPCHAT_APPROVALS_USER_NAME",
 	"HIPCHAT_APPROVALS_BOT_NAME", "HIPCHAT_APPROVALS_PASSWORT", "HIPCHAT_CONNECTION_ATTEMPTS", "MATTERMOST_ENDPOINT", "MATTERMOST_USERNAME",
 	"TEAMS_WEBHOOK_URL", "DISCORD_WEBHOOK_URL", "SHOUTRRR_URLS", "SHOUTRRR_TIMEOUT", "MAIL_TO", "MAIL_FROM", "MAIL_SMTP_SERVER",
 	"MAIL_SMTP_PORT", "MAIL_SMTP_USER", "MAIL_SMTP_PASS", "BASIC_AUTH_USER", "BASIC_AUTH_PASSWORD", "AUTHENTICATED_WEBHOOKS",
@@ -145,6 +145,9 @@ type SlackBotConfig struct {
 	AppToken         string `envconfig:"SLACK_APP_TOKEN"`
 	BotName          string `envconfig:"SLACK_BOT_NAME" default:"keel"`
 	ApprovalsChannel string `envconfig:"SLACK_APPROVALS_CHANNEL" default:"general"`
+	// HideApprovalCommands leaves the list of bot commands out of approval
+	// messages; "@keel help" still lists them.
+	HideApprovalCommands bool `envconfig:"SLACK_APPROVAL_HIDE_COMMANDS" default:"false"`
 }
 
 // HipchatBotConfig configures the HipChat approvals bot, credentials, and connection behavior.

@@ -99,6 +99,8 @@ slack:
   botToken: ""
   channel: ""
   approvalsChannel: ""
+  # leave the list of bot commands out of approval messages ("@keel help" still lists them)
+  hideApprovalCommands: false
 
 # Hipchat notification and approvals
 hipchat:
