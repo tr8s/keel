@@ -22,6 +22,9 @@ message, mentioning the approvers.
 
 Resources without approvals are not followed, unless deploy notices are on (see [deploy-notices.md](deploy-notices.md)).
 
+Approval messages show the environment label of `keel.sh/environment` next to the workload, ie: `*trackeid · prod*`.
+It is display only; see [deploy-notices.md](deploy-notices.md#environment-label).
+
 ## Roll back
 
 The live and failed states of the approval message offer **Roll back…** in the overflow menu (⋯) of the rollout

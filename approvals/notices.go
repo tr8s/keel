@@ -50,6 +50,9 @@ func (m *DefaultManager) recordDeployNotice(r *types.Approval, member types.Appr
 			notice.IncludesMigration = true
 			changed = true
 		}
+		if mergeEnvironment(notice, r.Environment, member.Identifier) {
+			changed = true
+		}
 		if !changed {
 			return notice, nil, nil
 		}

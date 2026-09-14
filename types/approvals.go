@@ -82,6 +82,11 @@ type Approval struct {
 	Members      ApprovalMembers `json:"members,omitempty" gorm:"type:json"`
 	SupersededBy string          `json:"supersededBy,omitempty"`
 
+	// Environment is the display label of the environment the workloads run
+	// in (keel.sh/environment), taken from the first member that has one. It
+	// does not change grouping. Empty when unset.
+	Environment string `json:"environment,omitempty"`
+
 	// Kind tells deploy notices (ApprovalKindNotice) apart from approvals,
 	// which leave it empty
 	Kind string `json:"kind,omitempty"`

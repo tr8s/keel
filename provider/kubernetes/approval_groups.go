@@ -65,6 +65,7 @@ func (p *Provider) isGroupApproved(event *types.Event, plan *UpdatePlan, group s
 			VotesRequired:  minApprovals,
 			Deadline:       time.Now().Add(time.Duration(deadline) * time.Hour),
 			Group:          groupKey,
+			Environment:    types.ParseEnvironment(resource.GetLabels(), resource.GetAnnotations()),
 		}
 
 		p.describeChange(req, plan, &event.Repository)

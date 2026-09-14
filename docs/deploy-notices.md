@@ -49,6 +49,18 @@ its own notice per revision (or digest).
 When a newer revision of the same group or resource is deployed while the older one still rolls out, the older notice
 ends with `:fast_forward: Superseded by <short sha>`.
 
+## Environment label
+
+`keel.sh/environment` on a resource is a display label, ie: `prod` or `staging`. It is shown in the header of approval
+and deploy notice messages (`*trackeid · prod* → 8b4d196`) and in their notification text
+(`Deploying selfled · staging 4c80a47: ...`); the default approval layout shows it as an `Environment` field. The label
+is trimmed, its whitespace collapsed and cut to 32 characters. In a group the first member that has a label decides;
+a different label of a later member is logged at debug level and not shown.
+
+The label does not change grouping: `keel.sh/approvalGroup` still groups by namespace and group name only. Setups that
+run several environments in one namespace (SelfLed style) should set the label on each workload, and give each
+environment its own group name when their workloads must not share an approval or notice.
+
 ## Rollout status
 
 The last line of a notice follows the rollout the same way as for approved updates (see

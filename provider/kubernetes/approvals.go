@@ -133,6 +133,7 @@ func (p *Provider) isApproved(event *types.Event, plan *UpdatePlan) (bool, error
 				VotesReceived:  0,
 				Rejected:       false,
 				Deadline:       time.Now().Add(time.Duration(deadline) * time.Hour),
+				Environment:    types.ParseEnvironment(plan.Resource.GetLabels(), plan.Resource.GetAnnotations()),
 			}
 
 			p.describeChange(approval, plan, &event.Repository)
