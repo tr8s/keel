@@ -101,6 +101,8 @@ slack:
   approvalsChannel: ""
   # leave the list of bot commands out of approval messages ("@keel help" still lists them)
   hideApprovalCommands: false
+  # show approval messages in a compact layout focused on the commit being deployed (no command list)
+  compactApprovals: false
 
 # Hipchat notification and approvals
 hipchat:

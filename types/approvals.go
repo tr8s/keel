@@ -54,6 +54,12 @@ type Approval struct {
 	CurrentRevision string `json:"currentRevision,omitempty"`
 	NewRevision     string `json:"newRevision,omitempty"`
 
+	// CommitSubject and CommitAuthor describe the commit the new image was
+	// built from when it carries the sh.keel.commit.subject and
+	// sh.keel.commit.author labels. Empty when unknown.
+	CommitSubject string `json:"commitSubject,omitempty"`
+	CommitAuthor  string `json:"commitAuthor,omitempty"`
+
 	// Digest is used to verify that images are the ones that got the approvals.
 	// If digest doesn't match for the image, votes are reset.
 	Digest string `json:"digest"`
@@ -155,16 +161,21 @@ func (a *Approval) Delta() string {
 	return fmt.Sprintf("%s -> %s", current, next)
 }
 
+// ShortDigest abbreviates a digest for display, ie: sha256:62c200e9
+func ShortDigest(digest string) string {
+	if algorithm, hex, ok := strings.Cut(digest, ":"); ok && len(hex) > 8 {
+		return algorithm + ":" + hex[:8]
+	}
+	return digest
+}
+
 // versionWithDigest appends an abbreviated digest to a version when the
 // digest is known, ie: main@sha256:62c200e9
 func versionWithDigest(version, digest string) string {
 	if digest == "" {
 		return version
 	}
-	if algorithm, hex, ok := strings.Cut(digest, ":"); ok && len(hex) > 8 {
-		digest = algorithm + ":" + hex[:8]
-	}
-	return version + "@" + digest
+	return version + "@" + ShortDigest(digest)
 }
 
 // JSONB is stored as a JSON blob

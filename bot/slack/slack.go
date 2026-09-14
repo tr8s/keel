@@ -34,6 +34,9 @@ type Bot struct {
 	// leave the list of bot commands out of approval messages
 	hideApprovalCommands bool
 
+	// show approval messages in the compact layout
+	compactApprovals bool
+
 	ctx                context.Context
 	botMessagesChannel chan *bot.BotMessage
 	approvalsRespCh    chan *bot.ApprovalResponse
@@ -60,6 +63,7 @@ func (b *Bot) Configure(appConfig config.Config, approvalsRespCh chan *bot.Appro
 	b.name = cfg.BotName
 	b.approvalsChannel = strings.TrimPrefix(cfg.ApprovalsChannel, "#")
 	b.hideApprovalCommands = cfg.HideApprovalCommands
+	b.compactApprovals = cfg.CompactApprovals
 	api := slack.New(cfg.BotToken, slack.OptionDebug(appConfig.Debug), slack.OptionAppLevelToken(cfg.AppToken))
 	b.slackSocket = socketmode.New(api, socketmode.OptionDebug(appConfig.Debug))
 	b.approvalsRespCh = approvalsRespCh
@@ -291,16 +295,27 @@ func (b *Bot) handleAction(username string, blockAction *slack.BlockAction) {
 	b.approvalsRespCh <- approval
 }
 
-// postApprovalMessageBlock - effectively post a message to the approval channel
-func (b *Bot) postApprovalMessageBlock(approvalId string, blocks slack.Blocks) error {
+// postApprovalMessageBlock - effectively post a message to the approval channel. The text, when not empty,
+// is the notification text of the message.
+func (b *Bot) postApprovalMessageBlock(approvalId string, blocks slack.Blocks, text string) error {
 	channelID := b.approvalsChannel
 	_, _, err := b.slackSocket.PostMessage(
 		channelID,
-		slack.MsgOptionBlocks(blocks.BlockSet...),
-		createApprovalMetadata(approvalId),
+		approvalMessageOptions(text,
+			slack.MsgOptionBlocks(blocks.BlockSet...),
+			createApprovalMetadata(approvalId),
+		)...,
 	)
 
 	return err
+}
+
+// approvalMessageOptions - add the notification text to the message options when there is one
+func approvalMessageOptions(text string, options ...slack.MsgOption) []slack.MsgOption {
+	if text != "" {
+		options = append(options, slack.MsgOptionText(text, true))
+	}
+	return options
 }
 
 // Respond - This method sent the text message to the provided channel
@@ -330,7 +345,7 @@ func (b *Bot) Respond(text string, channel string) {
 // upsertApprovalMessage - update the approval message that was sent for the given resource identifier (deployment/default/wd:0.0.15).
 // if the message is not found in the approval channel it will be created. That way even it the message is deleted,
 // we will see the approval status
-func (b *Bot) upsertApprovalMessage(approvalId string, blocks slack.Blocks) {
+func (b *Bot) upsertApprovalMessage(approvalId string, blocks slack.Blocks, text string) {
 	// Retrieve the message history
 	historyParams := &slack.GetConversationHistoryParameters{
 		ChannelID:          b.approvalChannelId,
@@ -341,7 +356,7 @@ func (b *Bot) upsertApprovalMessage(approvalId string, blocks slack.Blocks) {
 	history, err := b.slackSocket.GetConversationHistory(historyParams)
 	if err != nil {
 		log.Debugf("Unable to get the conversation history to edit the message, post new one: %v", err)
-		b.postApprovalMessageBlock(approvalId, blocks)
+		b.postApprovalMessageBlock(approvalId, blocks, text)
 	}
 
 	// Find the message to update; the channel id and the message timestamp is the identifier of a message for slack
@@ -355,15 +370,17 @@ func (b *Bot) upsertApprovalMessage(approvalId string, blocks slack.Blocks) {
 
 	if messageTs == "" {
 		log.Debug("Unable to find the approval message for the identifier. Post a new message instead")
-		b.postApprovalMessageBlock(approvalId, blocks)
+		b.postApprovalMessageBlock(approvalId, blocks, text)
 		return
 	} else {
 		b.slackSocket.UpdateMessage(
 			b.approvalChannelId,
 			messageTs,
-			slack.MsgOptionBlocks(blocks.BlockSet...),
-			slack.MsgOptionAsUser(true),
-			createApprovalMetadata(approvalId),
+			approvalMessageOptions(text,
+				slack.MsgOptionBlocks(blocks.BlockSet...),
+				slack.MsgOptionAsUser(true),
+				createApprovalMetadata(approvalId),
+			)...,
 		)
 	}
 }
