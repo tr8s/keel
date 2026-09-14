@@ -283,7 +283,7 @@ func (b *Bot) isEventFromApprovalsChannel(event *slackevents.AppMentionEvent) bo
 // The bot will only receive events coming from its own action blocks. Block action can only be used to approve
 // or reject an approval request (other commands should be managed by user bot mentions).
 func (b *Bot) handleAction(username string, blockAction *slack.BlockAction) {
-	eventText := fmt.Sprintf("%s %s", blockAction.ActionID, blockAction.Value)
+	eventText := actionText(blockAction)
 	approval, ok := bot.IsApproval(username, eventText)
 
 	if !ok {

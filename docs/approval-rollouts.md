@@ -24,9 +24,12 @@ Resources without approvals are not followed.
 
 ## Roll back
 
-The live and failed states, and the failure reply, offer a **Roll back** button. `@keel rollback <approval
-identifier>` does the same. The same rule as approving applies: the request must come from the approvals channel.
-Keel records who rolled back on the approval and in the audit log.
+The live and failed states of the approval message offer **Roll back…** in the overflow menu (⋯) of the rollout
+line, so it is not clicked by accident. The failure reply in the thread offers a visible **Roll back** button, since
+speed matters there. Both ask for confirmation first, and `@keel rollback <approval identifier>` does the same. The
+same rule as approving applies: the request must come from the approvals channel. Keel records who rolled back on the
+approval and in the audit log. Neither the menu nor the button is offered when the previous image of a resource is
+unknown, once the update was rolled back, or on a superseded approval.
 
 A rollback sets every resource updated from the approval back to the image it ran before, pinned by digest
 (`registry/repository@sha256:...`). Pinning matters with a moving tag and `imagePullPolicy: Always`: restarting pods

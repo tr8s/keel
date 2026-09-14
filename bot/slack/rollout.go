@@ -96,25 +96,54 @@ func rolloutBlocks(req *types.Approval, group string) []slack.Block {
 		return nil
 	}
 
+	if state := req.RolloutState(); (state == types.RolloutStateLive || state == types.RolloutStateFailed) && req.RollbackError() == nil {
+		// rolling back sits in the overflow menu of the rollout line, so it is not clicked by accident
+		return []slack.Block{slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", status, false, false),
+			nil,
+			slack.NewAccessory(createRollbackMenu(req, group)),
+		)}
+	}
+
 	blocks := []slack.Block{compactContext(status)}
 	if req.RollbackFailure != "" {
 		blocks = append(blocks, compactContext(":warning: Roll back failed: "+escapeMrkdwn(req.RollbackFailure)))
 	}
-	if state := req.RolloutState(); (state == types.RolloutStateLive || state == types.RolloutStateFailed) && req.RollbackError() == nil {
-		blocks = append(blocks, createRollbackButton(req, group))
-	}
 	return blocks
 }
 
-// createRollbackButton - the roll back button of an approval, confirming what it sets back and that database
-// changes are not rolled back
+// createRollbackMenu - the overflow menu of a live or failed rollout, with one option to roll back after confirming
+func createRollbackMenu(req *types.Approval, group string) *slack.OverflowBlockElement {
+	menu := slack.NewOverflowBlockElement(
+		bot.RollbackResponseKeyword,
+		slack.NewOptionBlockObject(req.ID, slack.NewTextBlockObject("plain_text", "Roll back…", false, false), nil),
+	)
+	menu.Confirm = rollbackConfirmation(req, group)
+	return menu
+}
+
+// createRollbackButton - the visible roll back button of the failure reply, where speed matters
 func createRollbackButton(req *types.Approval, group string) *slack.ActionBlock {
+	button := slack.NewButtonBlockElement(
+		bot.RollbackResponseKeyword,
+		req.ID,
+		slack.NewTextBlockObject("plain_text", "Roll back", true, false),
+	)
+	button.Style = slack.StyleDanger
+	button.Confirm = rollbackConfirmation(req, group)
+
+	return slack.NewActionBlock("", button)
+}
+
+// rollbackConfirmation - the dialog confirming what a rollback sets back and that database changes are not rolled
+// back
+func rollbackConfirmation(req *types.Approval, group string) *slack.ConfirmationBlockObject {
 	var names []string
 	for _, target := range req.Rollout {
 		names = append(names, shortMemberName(target.Name, group))
 	}
 
-	confirm := slack.NewConfirmationBlockObject(
+	return slack.NewConfirmationBlockObject(
 		slack.NewTextBlockObject("plain_text", "Roll back?", false, false),
 		slack.NewTextBlockObject("mrkdwn", fmt.Sprintf("Sets %s back to %s. Database changes are not rolled back.",
 			escapeMrkdwn(strings.Join(names, ", ")),
@@ -123,16 +152,6 @@ func createRollbackButton(req *types.Approval, group string) *slack.ActionBlock 
 		slack.NewTextBlockObject("plain_text", "Roll back", false, false),
 		slack.NewTextBlockObject("plain_text", "Cancel", false, false),
 	)
-
-	button := slack.NewButtonBlockElement(
-		bot.RollbackResponseKeyword,
-		req.ID,
-		slack.NewTextBlockObject("plain_text", "Roll back", true, false),
-	)
-	button.Style = slack.StyleDanger
-	button.Confirm = confirm
-
-	return slack.NewActionBlock("", button)
 }
 
 // previousReference - what a rollback sets the resources back to: the revision of the image that ran before when
