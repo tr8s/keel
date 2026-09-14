@@ -41,7 +41,13 @@ func createCompactBlockMessage(req *types.Approval) (slack.Blocks, string) {
 	}
 
 	subject := truncateText(req.CommitSubject, maxCommitSubjectLength)
-	if subject != "" {
+	if lines := commitLines(req); lines != "" {
+		blocks = append(blocks, slack.NewSectionBlock(
+			slack.NewTextBlockObject("mrkdwn", lines, false, false),
+			nil,
+			nil,
+		))
+	} else if subject != "" {
 		blocks = append(blocks, slack.NewSectionBlock(
 			slack.NewTextBlockObject("mrkdwn", escapeMrkdwn(subject), false, false),
 			nil,
@@ -107,8 +113,8 @@ func createCompactBlockMessage(req *types.Approval) (slack.Blocks, string) {
 		text += " (" + strings.Join(members, ", ") + ")"
 	}
 	text += " " + reference
-	if subject != "" {
-		text += ": " + subject
+	if headline := commitHeadline(req, subject); headline != "" {
+		text += ": " + headline
 	}
 
 	return slack.Blocks{BlockSet: blocks}, text
